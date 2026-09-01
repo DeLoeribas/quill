@@ -1,0 +1,10 @@
+{
+    "folders": ["Tech", "News"],
+    "feeds": [
+        {"url": "https://news.ycombinator.com/rss", "folder": "Tech"},
+        {"url": "https://www.theverge.com/rss/index.xml", "folder": "Tech"},
+        {"url": "https://feeds.arstechnica.com/arstechnica/index", "folder": "Tech"},
+        {"url": "http://feeds.bbci.co.uk/news/world/rss.xml", "folder": "News"},
+        {"url": "https://feeds.npr.org/1001/rss.xml", "folder": "News"}
+    ]
+}

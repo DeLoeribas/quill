@@ -1,0 +1,11 @@
+/data/feeds.json
+/data/auth.json
+/data/login_attempts.json
+/data/items/*.json
+/data/cron.log
+/data/cron-stderr.log
+/src/config.php
+/.htpasswd
+.DS_Store
+*.opml
+/deploy/

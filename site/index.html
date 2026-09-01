@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quill</title>
+<meta name="description" content="A minimal, fast personal RSS/Atom/JSON reader you run yourself. Plain PHP, flat JSON storage, no framework, no database.">
+<!-- Set canonical/og:url to wherever this page ends up being deployed -->
+<link rel="canonical" href="https://quill.appmac.fr">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Quill">
+<meta property="og:description" content="A minimal, fast personal RSS/Atom/JSON reader you run yourself.">
+<meta property="og:url" content="https://quill.appmac.fr">
+<meta property="og:image" content="https://quill.appmac.fr/main.webp">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Quill">
+<meta name="twitter:description" content="A minimal, fast personal RSS/Atom/JSON reader you run yourself.">
+<meta name="twitter:image" content="https://quill.appmac.fr/main.webp">
+<script type="application/ld+json">{"name":"Quill","codeRepository":"https:\/\/github.com\/DeLoeribas\/quill","image":"https:\/\/quill.appmac.fr\/main.webp","applicationCategory":"News","url":"https:\/\/quill.appmac.fr","@type":"WebApplication","description":"A minimal, fast personal RSS\/Atom\/JSON reader you run yourself.","@context":"https:\/\/schema.org","operatingSystem":"PHP 7.4+, any web host"}</script>
+<style>*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #ffffff; --bg-2: #f5f5f7; --bg-card: #ffffff;
+  --border: rgba(0,0,0,.08);
+  --text: #1d1d1f; --text-2: #6e6e73;
+  --accent: #2563eb;
+  --shadow-sm: 0 2px 8px rgba(0,0,0,.06);
+  --shadow-md: 0 8px 32px rgba(0,0,0,.10);
+  --shadow-lg: 0 24px 64px rgba(0,0,0,.13);
+  --radius-sm: 10px; --radius-md: 16px; --radius-lg: 24px;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --code-bg: #f5f5f7; --code-border: rgba(0,0,0,.10);
+  --tinted-bg: color-mix(in srgb, var(--accent) 8%, var(--bg-2));
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #000000; --bg-2: #1c1c1e; --bg-card: #1c1c1e;
+    --border: rgba(255,255,255,.1);
+    --text: #f5f5f7; --text-2: #98989d;
+    --accent: #60a5fa;
+    --shadow-sm: 0 2px 8px rgba(0,0,0,.3);
+    --shadow-md: 0 8px 32px rgba(0,0,0,.4);
+    --code-bg: #2d2f36; --code-border: transparent;
+  }
+}
+html { scroll-behavior: smooth; }
+body { font-family: var(--font); background: var(--bg); color: var(--text); line-height: 1.6; }
+a { color: var(--accent); text-decoration: none; }
+img { max-width: 100%; }
+/* Nav */
+.nav { position: sticky; top: 0; z-index: 100;
+  background: rgba(255,255,255,.8); backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border); }
+@media (prefers-color-scheme: dark) { .nav { background: rgba(0,0,0,.8); } }
+.nav-inner { max-width: 960px; margin: 0 auto; padding: 0 24px;
+  display: flex; align-items: center; justify-content: space-between; height: 52px; }
+.nav-brand-group { display: flex; flex-direction: column; gap: 1px; }
+.nav-brand { font-weight: 600; font-size: 17px; color: var(--text); transition: opacity .2s; }
+.nav-brand:hover { opacity: .7; }
+.nav-domain { font-size: 11px; color: var(--text-2); transition: color .2s; }
+.nav-domain:hover { color: var(--accent); }
+.nav-links { display: flex; gap: 24px; }
+.nav-link { color: var(--text-2); font-size: 15px; transition: color .2s; position: relative; padding-bottom: 2px; }
+.nav-link::after { content: ''; position: absolute; bottom: -2px; left: 0; right: 0;
+  height: 2px; background: var(--accent); border-radius: 1px;
+  transform: scaleX(0); transition: transform .2s ease; transform-origin: center; }
+.nav-link:hover { color: var(--accent); }
+.nav-link:hover::after { transform: scaleX(1); }
+/* Buttons */
+.btn-primary { display: inline-block; padding: 14px 28px; background: var(--accent);
+  color: #fff; border-radius: var(--radius-sm); font-weight: 600; font-size: 17px;
+  transition: transform .15s ease, box-shadow .15s ease, opacity .15s; }
+.btn-primary:hover { color: #fff; transform: scale(1.04);
+  box-shadow: 0 8px 24px rgba(0,0,0,.22); }
+.btn-primary:active { transform: scale(.98); }
+/* Hero */
+.hero { padding: 80px 24px 60px; text-align: center; overflow: hidden; }
+.hero-inner { max-width: 720px; margin: 0 auto; }
+@keyframes heroFloat {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-10px); }
+}
+@keyframes heroFadeUp {
+  from { opacity: 0; transform: translateY(22px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .app-icon    { animation: heroFloat 6s ease-in-out infinite; }
+  .hero-title  { animation: heroFadeUp .55s .05s ease both; }
+  .hero-tagline{ animation: heroFadeUp .55s .15s ease both; }
+  .hero-desc   { animation: heroFadeUp .55s .25s ease both; }
+  .hero .btn-primary { animation: heroFadeUp .55s .35s ease both; }
+}
+.hero-title-row { display: flex; align-items: center; justify-content: center;
+  gap: 14px; margin-bottom: 12px; }
+.app-icon { width: clamp(36px,6vw,56px); height: clamp(36px,6vw,56px); border-radius: 22%;
+  box-shadow: var(--shadow-md); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: clamp(20px,3.4vw,32px); background: var(--tinted-bg); border: 1px solid var(--border); }
+.hero-title { font-size: clamp(36px,6vw,56px); font-weight: 700;
+  letter-spacing: -.5px; }
+.hero-tagline { font-size: clamp(18px,3vw,22px); color: var(--text-2);
+  font-weight: 500; margin-bottom: 16px; }
+.hero-desc { font-size: 17px; color: var(--text-2); margin-bottom: 32px;
+  max-width: 620px; margin-left: auto; margin-right: auto; text-align: left; }
+.hero-desc h2 { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+.hero-note { font-size: 13px; color: var(--text-2); margin-top: 14px; }
+/* Screenshot */
+.screenshot-section { padding: 0 24px 80px; text-align: center; }
+.screenshot-wrap { max-width: 720px; margin: 0 auto; }
+.screenshot-main { display: block; width: 100%; height: auto;
+  border-radius: var(--radius-md); box-shadow: var(--shadow-lg);
+  transition: transform .4s ease, box-shadow .4s ease; }
+.screenshot-main:hover { transform: scale(1.015) translateY(-4px);
+  box-shadow: 0 40px 80px rgba(0,0,0,.16); }
+/* Sections */
+.section { padding: 80px 24px; }
+.section-alt { background: var(--bg-2); }
+.section-inner { max-width: 960px; margin: 0 auto; }
+.eyebrow { font-size: 13px; font-weight: 600; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
+.section-title { font-size: clamp(28px,4vw,36px); font-weight: 700;
+  letter-spacing: -.3px; margin-bottom: 40px; }
+/* Feature cards */
+.features-grid { display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px,1fr)); gap: 20px; }
+.feature-card { background: var(--bg-card); border-radius: var(--radius-md);
+  padding: 24px; border: 1px solid var(--border); box-shadow: var(--shadow-sm);
+  transition: transform .22s ease, box-shadow .22s ease, border-color .22s ease; }
+.feature-card:hover { transform: translateY(-5px);
+  box-shadow: var(--shadow-md); border-color: var(--accent); }
+.feature-icon { font-size: 28px; margin-bottom: 12px; }
+.feature-card h3 { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
+.feature-card p { font-size: 14px; color: var(--text-2); line-height: 1.5; }
+/* Requirements */
+.req-pills { display: flex; flex-wrap: wrap; gap: 12px; }
+.req-pill { background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 20px; padding: 8px 20px; font-size: 15px; font-weight: 500;
+  transition: border-color .2s, color .2s; }
+.req-pill:hover { border-color: var(--accent); color: var(--accent); }
+/* Self-hosting */
+.deploy-section { text-align: left; }
+.deploy-text { font-size: 17px; color: var(--text-2); margin-bottom: 24px; max-width: 640px; }
+.deploy-code { background: var(--code-bg); border: 1px solid var(--code-border);
+  border-radius: var(--radius-md); padding: 20px 24px; font-family: var(--mono);
+  font-size: 14px; line-height: 1.7; overflow-x: auto; max-width: 640px; }
+.deploy-code .c { color: var(--text-2); }
+.deploy-more { margin-top: 20px; font-size: 15px; }
+/* Footer */
+.footer { border-top: 1px solid var(--border); padding: 32px 24px;
+  background: var(--tinted-bg); }
+.footer-inner { max-width: 960px; margin: 0 auto;
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 14px; color: var(--text-2); flex-wrap: wrap; gap: 12px; }
+.footer-links { display: flex; gap: 20px; }
+.footer-links a { color: var(--text-2); transition: color .2s; }
+.footer-links a:hover { color: var(--accent); }
+/* Scroll reveal */
+.reveal { opacity: 0; transform: translateY(26px);
+  transition: opacity .55s ease, transform .55s ease;
+  transition-delay: var(--reveal-delay, 0s); }
+.reveal.is-visible { opacity: 1; transform: translateY(0); }
+@media (prefers-reduced-motion: reduce) {
+  .reveal { opacity: 1; transform: none; transition: none; }
+}</style>
+</head>
+<body>
+<nav class="nav">
+  <div class="nav-inner">
+    <div class="nav-brand-group">
+      <a href="#" class="nav-brand">Quill</a>
+      <a href="https://appmac.fr" class="nav-domain">AppMac</a>
+    </div>
+    <div class="nav-links">
+      <a href="https://github.com/DeLoeribas/quill" class="nav-link">GitHub</a>
+    </div>
+  </div>
+</nav>
+<section class="hero">
+  <div class="hero-inner">
+    <div class="hero-title-row">
+      <div class="app-icon">🪶</div>
+      <h1 class="hero-title">Quill</h1>
+    </div>
+    <p class="hero-tagline">A minimal, fast personal RSS reader you run yourself.</p>
+    <div class="hero-desc">
+      <h2>What Is Quill?</h2>
+      A place to read your feeds without an account, a subscription, or someone else's server deciding what you see. Add any RSS, Atom, or JSON feed by URL — paste a site's link and Quill finds the feed for you, or paste a YouTube channel and it resolves straight to that channel's video feed.<br><br>
+      <h2>Plain PHP, Not a Platform</h2>
+      No framework, no database, no build step. Quill stores everything as flat JSON files and runs on whatever PHP hosting you already have — from a few dollars a month of shared hosting to your own Mac.<br><br>
+      <h2>Built for Speed</h2>
+      Refreshing dozens of feeds fetches them concurrently instead of one at a time, the frontend is vanilla JS with no framework to ship, and there's no database to query — pages load and refresh fast, even with thousands of stored items.<br><br>
+      <h2>Yours, Not Rented</h2>
+      One login gates the whole thing. Your feeds, your read history, your saved articles — all in files you control, exportable to OPML any time you want to leave.
+    </div>
+    <a href="https://github.com/DeLoeribas/quill" class="btn-primary">View on GitHub</a>
+    <p class="hero-note reveal" style="--reveal-delay:.4s">Not a hosted service — you'll need your own PHP hosting (shared hosting, a VPS, or your own machine) to run it.</p>
+  </div>
+</section>
+<section class="screenshot-section">
+  <div class="screenshot-wrap reveal">
+    <video id="hero-video" class="screenshot-main" src="main.mp4" poster="main.webp" autoplay muted loop playsinline webkit-playsinline aria-label="Quill reading the day's feeds — folder sidebar, item list, and reading pane"></video>
+  </div>
+</section>
+<section class="section">
+  <div class="section-inner">
+    <p class="eyebrow reveal">Features</p>
+    <h2 class="section-title reveal" style="--reveal-delay:.05s">Everything you need, nothing you don't</h2>
+    <div class="features-grid">
+      <div class="feature-card reveal" style="--reveal-delay:0.00s">
+        <div class="feature-icon">⚡</div>
+        <h3>Built for Speed</h3>
+        <p>Feeds refresh concurrently via curl_multi instead of one at a time, and with no framework or database in the way, the UI stays snappy at any size.</p>
+      </div>
+      <div class="feature-card reveal" style="--reveal-delay:0.05s">
+        <div class="feature-icon">➕</div>
+        <h3>Add Feeds Instantly</h3>
+        <p>RSS 2.0, Atom, and JSON Feed all supported. Paste a plain site URL and Quill auto-discovers any feed(s) it declares.</p>
+      </div>
+      <div class="feature-card reveal" style="--reveal-delay:0.07s">
+        <div class="feature-icon">📁</div>
+        <h3>Folders &amp; Unread</h3>
+        <p>A collapsible folder tree groups your feeds, plus a dedicated Unread view across every feed at once.</p>
+      </div>
+      <div class="feature-card reveal" style="--reveal-delay:0.14s">
+        <div class="feature-icon">⏸️</div>
+        <h3>Enable / Disable Feeds</h3>
+        <p>Pause a feed without losing its history — it keeps its items but is skipped by every refresh until resumed.</p>
+      </div>
+      <div class="feature-card reveal" style="--reveal-delay:0.21s">
+        <div class="feature-icon">✓</div>
+        <h3>Read / Unread Tracking</h3>
+        <p>Unread counts everywhere they matter, with a one-key toggle to mark any item read or unread.</p>
+      </div>
+      <div class="feature-card reveal" style="--reveal-delay:0.28s">
+        <div class="feature-icon">🔖</div>
+        <h3>Save Items</h3>
+        <p>Keep the articles worth returning to in a dedicated Saved view, independent of read state.</p>
+      </div>
+      <div class="feature-card reveal" style="--reveal-delay:0.35s">
+        <div class="feature-icon">🔄</div>
+        <h3>Manual &amp; Scheduled Refresh</h3>
+        <p>Refresh on demand from the header, or let cron keep everything current in the background.</p>
+      </div>
+      <div class="feature-card reveal" style="--reveal-delay:0.42s">
+        <div class="feature-icon">⏱️</div>
+        <h3>Per-Feed Refresh Interval</h3>
+        <p>Feeds that declare their own cadence use it automatically; every other feed gets a clickable preset from 15 minutes to 24 hours.</p>
+      </div>
+      <div class="feature-card reveal" style="--reveal-delay:0.49s">
+        <div class="feature-icon">🔔</div>
+        <h3>Live Unread Badges</h3>
+        <p>The open tab quietly polls for new items and updates sidebar counts — without ever touching what you're currently reading.</p>
+      </div>
+      <div class="feature-card reveal" style="--reveal-delay:0.56s">
+        <div class="feature-icon">📤</div>
+        <h3>OPML Import &amp; Export</h3>
+        <p>Bring your feeds from anywhere, and take them with you again whenever you like.</p>
+      </div>
+      <div class="feature-card reveal" style="--reveal-delay:0.63s">
+        <div class="feature-icon">🔒</div>
+        <h3>Single-User Login</h3>
+        <p>A username, a password, a bcrypt hash — no database, no third-party auth, gating every page and request.</p>
+      </div>
+      <div class="feature-card reveal" style="--reveal-delay:0.70s">
+        <div class="feature-icon">🖼️</div>
+        <h3>Favicons &amp; Thumbnails</h3>
+        <p>Each feed shows its real favicon, and items show a preview image when one can be found — no third-party image service involved.</p>
+      </div>
+      <div class="feature-card reveal" style="--reveal-delay:0.77s">
+        <div class="feature-icon">🔎</div>
+        <h3>Per-Feed Content Filters</h3>
+        <p>Skip items matching a comma-separated list of strings, set individually per feed.</p>
+      </div>
+      <div class="feature-card reveal" style="--reveal-delay:0.84s">
+        <div class="feature-icon">📺</div>
+        <h3>YouTube Channels</h3>
+        <p>Paste a channel, handle, or legacy custom URL and Quill resolves it to that channel's video feed automatically.</p>
+      </div>
+      <div class="feature-card reveal" style="--reveal-delay:0.91s">
+        <div class="feature-icon">🔍</div>
+        <h3>Saved Searches</h3>
+        <p>Pin any search query as a named view in the sidebar, alongside your folders, for instant recall later.</p>
+      </div>
+      <div class="feature-card reveal" style="--reveal-delay:0.98s">
+        <div class="feature-icon">⌨️</div>
+        <h3>Keyboard-Driven</h3>
+        <p>Navigate entirely without a mouse — j/k or arrow keys move through feeds and items, and <code>?</code> opens the full shortcut list.</p>
+      </div>
+      <div class="feature-card reveal" style="--reveal-delay:1.05s">
+        <div class="feature-icon">↔️</div>
+        <h3>Resizable Layout</h3>
+        <p>Drag the sidebar and reading pane to whatever width suits you — remembered across reloads.</p>
+      </div>
+      <div class="feature-card reveal" style="--reveal-delay:1.12s">
+        <div class="feature-icon">💾</div>
+        <h3>Backup &amp; Restore</h3>
+        <p>Download every feed, folder, filter, saved search, and read/starred state as one file, and restore it later or on a fresh install.</p>
+      </div>
+      <div class="feature-card reveal" style="--reveal-delay:1.19s">
+        <div class="feature-icon">📱</div>
+        <h3>Mobile Ready</h3>
+        <p>Below tablet width the sidebar becomes a slide-in drawer with touch-friendly controls throughout.</p>
+      </div>
+      <div class="feature-card reveal" style="--reveal-delay:1.26s">
+        <div class="feature-icon">🌗</div>
+        <h3>Automatic Dark Mode</h3>
+        <p>Follows your system appearance, with contrast tuned for both light and dark.</p>
+      </div>
+    </div>
+  </div>
+</section>
+<section class="section section-alt">
+  <div class="section-inner">
+    <p class="eyebrow reveal">Requirements</p>
+    <h2 class="section-title reveal" style="--reveal-delay:.05s">What you need</h2>
+    <div class="req-pills reveal" style="--reveal-delay:.1s">
+      <span class="req-pill">Your own PHP hosting</span>
+      <span class="req-pill">PHP 7.4+</span>
+      <span class="req-pill">No database</span>
+      <span class="req-pill">No build step</span>
+    </div>
+  </div>
+</section>
+<section class="section deploy-section">
+  <div class="section-inner">
+    <p class="eyebrow reveal">Self-Hosted</p>
+    <h2 class="section-title reveal" style="--reveal-delay:.05s">Deploy it on your own site</h2>
+    <p class="deploy-text reveal" style="--reveal-delay:.1s">Quill is open source and built to run on plain PHP hosting — no server you don't already control. Clone it, drop in a config file, and package a clean copy for upload:</p>
+    <pre class="deploy-code reveal" style="--reveal-delay:.15s"><span class="c"># clone and configure</span>
+git clone https://github.com/DeLoeribas/quill.git
+cd quill
+cp src/config.sample.php src/config.php
+
+<span class="c"># build a clean upload with no personal data</span>
+bin/package-for-deploy.sh</pre>
+    <p class="deploy-more reveal" style="--reveal-delay:.2s">Upload the contents of <code>./deploy/</code>, pointing your document root at <code>public/</code>. Add a cron job (or a URL-based one for hosts without shell access) to keep feeds refreshing in the background. <a href="https://github.com/DeLoeribas/quill#readme">Full deployment guide on GitHub →</a></p>
+  </div>
+</section>
+<footer class="footer">
+  <div class="footer-inner">
+    <span>© 2026 Quill</span>
+    <div class="footer-links">
+      <a href="https://github.com/DeLoeribas/quill">GitHub</a>
+      <a href="#" id="__contact">Contact</a>
+    </div>
+  </div>
+</footer>
+<script>
+(function(){
+  if(!window.IntersectionObserver) return;
+  var io = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(e.isIntersecting){ e.target.classList.add('is-visible'); io.unobserve(e.target); }
+    });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('.reveal').forEach(function(el){ io.observe(el); });
+})();
+(function(){
+  var v=document.getElementById('hero-video');
+  if(!v)return;
+  // Belt-and-suspenders for Safari: some versions only honor `muted` reliably
+  // as a JS property set before play() is called, not just as an HTML attribute.
+  v.muted=true;
+  var p=v.play();
+  if(p&&p.catch) p.catch(function(){});
+})();
+(function(){
+  var el=document.getElementById('__contact');
+  if(!el)return;
+  var c=[105,110,102,111,64,97,112,112,109,97,99,46,102,114];
+  var addr=c.map(function(n){return String.fromCharCode(n);}).join('');
+  el.href='mailto:'+addr+'?subject='+encodeURIComponent("Quill");
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+Options -Indexes
+
+# HTTP Basic Auth — gates every request (including GET) at the web-server
+# level, before PHP even runs. AuthUserFile must be an ABSOLUTE path and
+# must match wherever this project actually lives on THIS server — update
+# it if you move/redeploy the project to a different path or host.
+# AuthType Basic
+AuthName "Quill"
+# AuthUserFile /home/yourusername/rss/.htpasswd
+# Require valid-user
