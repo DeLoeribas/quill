@@ -152,7 +152,7 @@ launchctl load ~/Library/LaunchAgents/com.example.quill.refresh.plist
    ```
    bin/package-for-deploy.sh
    ```
-   which uses `git archive` to build a clean copy in `./deploy/` containing only what's tracked in git — no personal data, ever. It also creates `deploy/src/config.php` from `config.sample.php` for you, with `CRON_TOKEN` left blank — the script prints a reminder to generate one yourself and set it in that file before uploading if you want scheduled refresh via `public/cron.php` (see "Scheduled refresh" → Option A below); store the generated value somewhere safe, since it can't be recovered from the server afterwards. Upload the contents of `./deploy/`. Point the site's **document root** at `public/` if your host allows it — this keeps `src/` and `data/` outside the web-exposed folder entirely, which is the safest setup.
+   which uses `git archive` to build a clean copy in `./deploy/` containing only what's tracked in git — no personal data, ever. It also stamps `deploy/src/version.php` with `git describe --tags --always` for the commit being packaged (shown in the app's footer — see "Versioning" below), and creates `deploy/src/config.php` from `config.sample.php` for you, with `CRON_TOKEN` left blank — the script prints a reminder to generate one yourself and set it in that file before uploading if you want scheduled refresh via `public/cron.php` (see "Scheduled refresh" → Option A below); store the generated value somewhere safe, since it can't be recovered from the server afterwards. Upload the contents of `./deploy/`. Point the site's **document root** at `public/` if your host allows it — this keeps `src/` and `data/` outside the web-exposed folder entirely, which is the safest setup.
 2. If your host only exposes a single folder (e.g. `public_html` *is* the repo root, `public/` can't be the doc root), the `.htaccess` files in `data/` and `src/` deny all direct requests to those folders as a fallback — but a document root above the repo is still preferable when available.
 3. **Optionally, also protect the site with HTTP Basic Auth** as an extra layer in front of the app's own login (step 4 below is what actually keeps strangers out on its own — this is defense-in-depth on top of that, and is disabled by default). `public/.htaccess` ships with the relevant lines commented out:
    ```
@@ -168,6 +168,19 @@ launchctl load ~/Library/LaunchAgents/com.example.quill.refresh.plist
    Paste the output as the full contents of `.htpasswd`, then uncomment the three `AuthType`/`AuthUserFile`/`Require` lines above — `AuthUserFile` **must** be an absolute path matching wherever the project actually lives on that server. This only works on real Apache/LiteSpeed hosting — PHP's built-in `php -S` dev server ignores `.htaccess` entirely, so it has no effect locally either way (expected). If you later remove `.htpasswd` again, make sure to re-comment those same lines — leaving `AuthUserFile` pointing at a now-missing file breaks every request with a 500 error instead of just removing the extra layer.
 4. The app's own login (see "Local setup" above) protects every page and API request on its own via a PHP session — this works even on hosts where you can't set a document root or rely on `.htaccess`/Basic Auth at all (the single-folder fallback in step 2). Credentials live in `data/auth.json`, outside the web-exposed folder and denied directly by `data/.htaccess` regardless.
 5. Schedule feed refreshes — see "Scheduled refresh" above for all three options. Shared hosts vary a lot here: some give real SSH/crontab access (Option B), some only a control-panel "Cron Jobs" page that still runs a shell command via a fixed PHP CLI path you'd get from your host's docs or `which php` over SSH, and some offer neither — only a "URL cron" field, or nothing at all. **Option A (`public/cron.php`, token-protected) is the one guaranteed to work regardless of which of those you get**, since it only needs an HTTP request, not shell access.
+
+## Versioning
+
+The app's footer shows a version, e.g. `v1.0.0` or `va1b2c3d`. There's no hand-maintained version constant — each run of `bin/package-for-deploy.sh` stamps `src/version.php` with `git describe --tags --always` for whatever commit it's archiving at that moment, so it's always accurate to what's actually deployed even though every install is packaged and uploaded independently. Running the app locally (unpackaged) shows `vdev`, since `src/version.php` only ever exists inside a packaged copy.
+
+With no tags yet, `git describe` falls back to a short commit hash. To get real version numbers instead, tag a release (without a `v` prefix — the footer already adds one):
+
+```
+git tag -a 1.0.0 -m "1.0.0"
+git push origin 1.0.0
+```
+
+The next `bin/package-for-deploy.sh` run on that commit will then stamp `1.0.0` instead of a hash; a few commits past a tag it'll read something like `1.0.0-3-gabc1234` (3 commits after the `1.0.0` tag, at commit `abc1234`).
 
 ## Project layout
 
