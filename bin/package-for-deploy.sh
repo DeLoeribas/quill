@@ -25,6 +25,15 @@ mkdir -p "$out"
 # ':!site' the marketing landing page — none of it is needed on the app server.
 git archive HEAD -- . ':!bin' ':!README.md' ':!site' | tar -x -C "$out"
 
+# Stamp the exact commit being archived into the package, since each deploy is an
+# independent snapshot on its own host, not a live git checkout. Falls back to a short
+# commit hash until you start tagging releases (git tag), then picks those up automatically.
+version="$(git describe --tags --always HEAD)"
+cat > "$out/src/version.php" <<PHP
+<?php
+define('APP_VERSION', '$version');
+PHP
+
 # config.php itself is gitignored (never committed), so git archive never produces one —
 # copy the sample in so the app runs out of the box. CRON_TOKEN is deliberately left blank
 # (see the loud reminder below): auto-generating it here would bury a secret the user needs

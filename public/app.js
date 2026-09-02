@@ -485,6 +485,7 @@
 
   async function loadSettings() {
     const data = await get('settings.php');
+    state.appVersion = data.app_version;
     state.lastBuildDate = data.last_build_date;
     state.serverName = data.server_name;
     state.phpVersion = data.php_version;
@@ -523,6 +524,9 @@
   function renderAppFooter() {
     const el = document.getElementById('app-footer-text');
     const parts = [];
+    if (state.appVersion) {
+      parts.push('v' + state.appVersion);
+    }
     if (state.lastBuildDate) {
       parts.push('Build: ' + new Date(state.lastBuildDate).toLocaleDateString());
     }

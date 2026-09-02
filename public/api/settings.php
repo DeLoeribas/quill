@@ -10,6 +10,7 @@ Auth::requireLogin();
 if ($method === 'GET') {
     $data = Storage::read(FEEDS_FILE, ['folders' => [], 'feeds' => []]);
     json_response([
+        'app_version' => APP_VERSION,
         'last_build_date' => last_build_date(),
         'server_name' => server_name(),
         'php_version' => phpversion(),

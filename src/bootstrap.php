@@ -205,6 +205,16 @@ function server_name(): string
     return $_SERVER['SERVER_NAME'] ?? $_SERVER['HTTP_HOST'] ?? (gethostname() ?: 'unknown');
 }
 
+// APP_VERSION is stamped into src/version.php by bin/package-for-deploy.sh at package
+// time, from the exact commit being archived — deployments are independent snapshots
+// per host, not live git checkouts, so this can't be a hand-maintained constant.
+// version.php doesn't exist in the repo (gitignored); local dev falls back to 'dev'.
+if (file_exists(__DIR__ . '/version.php')) {
+    require_once __DIR__ . '/version.php';
+} else {
+    define('APP_VERSION', 'dev');
+}
+
 function read_items_file(string $feedId): array
 {
     return Storage::read(items_file_path($feedId), ['feed_id' => $feedId, 'items' => []]);

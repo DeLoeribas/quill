@@ -5,6 +5,7 @@
 /data/cron.log
 /data/cron-stderr.log
 /src/config.php
+/src/version.php
 /.htpasswd
 .DS_Store
 *.opml
