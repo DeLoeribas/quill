@@ -486,6 +486,7 @@
   async function loadSettings() {
     const data = await get('settings.php');
     state.appVersion = data.app_version;
+    state.latestVersion = data.latest_version;
     state.lastBuildDate = data.last_build_date;
     state.serverName = data.server_name;
     state.phpVersion = data.php_version;
@@ -539,6 +540,14 @@
     const activeCount = state.feeds.filter(f => f.enabled !== false).length;
     parts.push(`${activeCount} active feed${activeCount === 1 ? '' : 's'} of ${state.feeds.length}`);
     el.textContent = parts.join(' · ');
+
+    const badge = document.getElementById('app-footer-update-badge');
+    if (state.latestVersion) {
+      badge.textContent = `Update available: v${state.latestVersion}`;
+      badge.hidden = false;
+    } else {
+      badge.hidden = true;
+    }
   }
 
   function renderLastUpdated() {

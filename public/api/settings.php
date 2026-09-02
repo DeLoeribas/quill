@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../src/bootstrap.php';
+require_once __DIR__ . '/../../src/GithubVersionChecker.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 Auth::requireLogin();
@@ -11,6 +12,7 @@ if ($method === 'GET') {
     $data = Storage::read(FEEDS_FILE, ['folders' => [], 'feeds' => []]);
     json_response([
         'app_version' => APP_VERSION,
+        'latest_version' => GithubVersionChecker::updateAvailable(APP_VERSION),
         'last_build_date' => last_build_date(),
         'server_name' => server_name(),
         'php_version' => phpversion(),

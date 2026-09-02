@@ -19,6 +19,12 @@ define('FETCH_USER_AGENT', 'Quill/1.0 (+local)');
 // How many feeds RefreshService::refreshAll() fetches concurrently via curl_multi.
 define('FETCH_CONCURRENCY', 8);
 
+// Repo the footer checks for a newer tagged release than APP_VERSION, and how often
+// (seconds) to re-check — result is cached in GITHUB_VERSION_CACHE_FILE between checks.
+define('GITHUB_REPO', 'DeLoeribas/quill');
+define('GITHUB_VERSION_CACHE_FILE', DATA_DIR . '/github_version.json');
+define('GITHUB_VERSION_CACHE_SECONDS', 6 * 3600);
+
 // How many read items to keep per feed before old ones are pruned.
 define('MAX_ITEMS_PER_FEED', 1000);
 

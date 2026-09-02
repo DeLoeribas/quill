@@ -4,6 +4,7 @@
 /data/items/*.json
 /data/cron.log
 /data/cron-stderr.log
+/data/github_version.json
 /src/config.php
 /src/version.php
 /.htpasswd

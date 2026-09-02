@@ -182,6 +182,8 @@ git push origin 1.0.0
 
 The next `bin/package-for-deploy.sh` run on that commit will then stamp `1.0.0` instead of a hash; a few commits past a tag it'll read something like `1.0.0-3-gabc1234` (3 commits after the `1.0.0` tag, at commit `abc1234`).
 
+The footer also checks GitHub for a newer tagged release than the one deployed (cached server-side for up to `GITHUB_VERSION_CACHE_SECONDS`, 6 hours by default). When the deployed version is behind, an "Update available: vX.Y.Z" badge appears linking to the repo's tags page — it stays hidden otherwise (including on an untagged/`dev` build, since there's nothing meaningful to compare).
+
 ## Project layout
 
 ```
