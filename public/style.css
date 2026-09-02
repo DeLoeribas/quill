@@ -1125,8 +1125,7 @@ body.resizing-reading-pane {
 #settings-overlay, #login-overlay, #shortcuts-overlay {
   position: fixed;
   inset: 0;
-  backdrop-filter: blur(5px);
-  -webkit-backdrop-filter: blur(5px);
+  background: rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: flex-start;
   justify-content: center;
@@ -1364,8 +1363,7 @@ kbd {
   font-size: 13px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
   /* Above #settings-overlay/#login-overlay/#shortcuts-overlay (z-index: 100) so a
-     toast fired while one of those is open isn't caught behind its backdrop-filter
-     blur. */
+     toast fired while one of those is open isn't caught behind its dim overlay. */
   z-index: 110;
 }
 
