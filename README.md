@@ -184,6 +184,20 @@ The next `bin/package-for-deploy.sh` run on that commit will then stamp `1.0.0` 
 
 The footer also checks GitHub for a newer tagged release than the one deployed (cached server-side for up to `GITHUB_VERSION_CACHE_SECONDS`, 6 hours by default). When the deployed version is behind, an "Update available: vX.Y.Z" badge appears linking to the repo's tags page — it stays hidden otherwise (including on an untagged/`dev` build, since there's nothing meaningful to compare).
 
+## Updating
+
+The badge only tells you a newer tag exists — it doesn't fetch or install anything for you. To actually update a deployed install:
+
+1. **Get the new code.** If you deployed from a git clone, `git pull` (or `git fetch --tags` then check out the tag you want). If you only ever downloaded a zip, grab the new tag's zip from the repo's tags page instead.
+2. **Repackage it.** From a git clone, run `bin/package-for-deploy.sh` again to build a fresh `./deploy/` stamped with the new version. (This step needs an actual git checkout — it shells out to `git archive`/`git describe`, so it won't run against a bare downloaded zip.)
+3. **Upload only the app code — not your data.** Overwrite the server's `public/` and `src/*.php` files with the new ones. **Do not** upload the freshly generated `deploy/src/config.php` — it's rebuilt from `config.sample.php` every run and will wipe your real login credentials and `CRON_TOKEN` if you overwrite the live one with it. Leave `data/` alone entirely; nothing in this process touches your feeds, read state, or saved items.
+4. **No git available on the server or locally?** Manually copy the changed files from the new zip over the old ones (same exclusions as above), then hand-edit `src/version.php` to the new tag, e.g.:
+   ```php
+   <?php
+   define('APP_VERSION', '1.1.0');
+   ```
+   Skipping this leaves the footer showing the old version, and the "Update available" badge will keep nagging even after you've actually updated.
+
 ## Project layout
 
 ```

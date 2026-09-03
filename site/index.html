@@ -183,6 +183,25 @@ img { max-width: 100%; }
       <h1 class="hero-title">Quill</h1>
     </div>
     <p class="hero-tagline">A minimal, fast personal RSS reader you run yourself.</p>
+  </div>
+</section>
+<section class="section deploy-section">
+  <div class="section-inner">
+    <p class="eyebrow reveal">Self-Hosted</p>
+    <h2 class="section-title reveal" style="--reveal-delay:.05s">Deploy it on your own site</h2>
+    <p class="deploy-text reveal" style="--reveal-delay:.1s">Quill is open source and built to run on plain PHP hosting — no server you don't already control. Clone it, drop in a config file, and package a clean copy for upload:</p>
+    <pre class="deploy-code reveal" style="--reveal-delay:.15s"><span class="c"># clone and configure</span>
+git clone https://github.com/DeLoeribas/quill.git
+cd quill
+cp src/config.sample.php src/config.php
+
+<span class="c"># build a clean upload with no personal data</span>
+bin/package-for-deploy.sh</pre>
+    <p class="deploy-more reveal" style="--reveal-delay:.2s">Upload the contents of <code>./deploy/</code>, pointing your document root at <code>public/</code>. Add a cron job (or a URL-based one for hosts without shell access) to keep feeds refreshing in the background. <a href="https://github.com/DeLoeribas/quill#readme">Full deployment guide on GitHub →</a></p>
+  </div>
+</section>
+<section class="hero">
+  <div class="hero-inner">
     <div class="hero-desc">
       <h2>What Is Quill?</h2>
       A place to read your feeds without an account, a subscription, or someone else's server deciding what you see. Add any RSS, Atom, or JSON feed by URL — paste a site's link and Quill finds the feed for you, or paste a YouTube channel and it resolves straight to that channel's video feed.<br><br>
@@ -320,21 +339,6 @@ img { max-width: 100%; }
       <span class="req-pill">No database</span>
       <span class="req-pill">No build step</span>
     </div>
-  </div>
-</section>
-<section class="section deploy-section">
-  <div class="section-inner">
-    <p class="eyebrow reveal">Self-Hosted</p>
-    <h2 class="section-title reveal" style="--reveal-delay:.05s">Deploy it on your own site</h2>
-    <p class="deploy-text reveal" style="--reveal-delay:.1s">Quill is open source and built to run on plain PHP hosting — no server you don't already control. Clone it, drop in a config file, and package a clean copy for upload:</p>
-    <pre class="deploy-code reveal" style="--reveal-delay:.15s"><span class="c"># clone and configure</span>
-git clone https://github.com/DeLoeribas/quill.git
-cd quill
-cp src/config.sample.php src/config.php
-
-<span class="c"># build a clean upload with no personal data</span>
-bin/package-for-deploy.sh</pre>
-    <p class="deploy-more reveal" style="--reveal-delay:.2s">Upload the contents of <code>./deploy/</code>, pointing your document root at <code>public/</code>. Add a cron job (or a URL-based one for hosts without shell access) to keep feeds refreshing in the background. <a href="https://github.com/DeLoeribas/quill#readme">Full deployment guide on GitHub →</a></p>
   </div>
 </section>
 <footer class="footer">
