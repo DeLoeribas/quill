@@ -264,6 +264,14 @@ final class RefreshService
                     if (empty($byId[$id]['image']) && !empty($parsed['image'])) {
                         $byId[$id]['image'] = $parsed['image'];
                     }
+                    // Unlike the thumbnail above, summary is kept in sync on every
+                    // refresh rather than only backfilled once: it's cheap to
+                    // re-derive, feeds can legitimately edit it, and it lets a
+                    // parser fix (e.g. reading YouTube's media:description) reach
+                    // already-stored items without a separate migration script.
+                    if (!empty($parsed['summary']) && $parsed['summary'] !== $byId[$id]['summary']) {
+                        $byId[$id]['summary'] = $parsed['summary'];
+                    }
                     continue;
                 }
                 if (self::matchesAnyFilter($parsed['title'] ?? '', $parsed['summary'] ?? '', $filters)) {

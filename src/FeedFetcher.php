@@ -345,7 +345,7 @@ final class FeedFetcher
             $published = self::text($xpath, 'a:published', $entryNode) ?: self::text($xpath, 'a:updated', $entryNode);
             $content = self::text($xpath, 'a:content', $entryNode);
             $summary = self::text($xpath, 'a:summary', $entryNode);
-            $body = $content ?: $summary;
+            $body = $content ?: $summary ?: self::plainTextWithLineBreaks(self::text($xpath, './/media:description', $entryNode));
             $image = self::extractImage($xpath, $entryNode, $body);
 
             $items[] = [
@@ -425,6 +425,17 @@ final class FeedFetcher
         }
         $value = trim($node->textContent);
         return $value === '' ? null : $value;
+    }
+
+    /**
+     * Unlike a:content/a:summary (often HTML), media:description is plain
+     * text — escape it so stray `<`/`&` survive the frontend's HTML parser
+     * as literal characters, then turn its newlines into <br> so paragraph
+     * breaks render instead of collapsing into one line.
+     */
+    private static function plainTextWithLineBreaks(?string $text): ?string
+    {
+        return $text !== null ? nl2br(htmlspecialchars($text, ENT_QUOTES, 'UTF-8')) : null;
     }
 
     private static function atomLink(DOMXPath $xpath, DOMNode $context): ?string
