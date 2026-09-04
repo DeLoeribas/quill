@@ -31,6 +31,7 @@
     folders: [],
     feeds: [],
     savedSearches: [],
+    tags: [],
     items: [],
     filter: { type: 'all', id: null },
     selectedItemId: null,
@@ -242,12 +243,19 @@
       path += '&unread_only=1';
     } else if (state.filter.type === 'starred') {
       path += '&starred_only=1';
+    } else if (state.filter.type === 'tag') {
+      path += '&tag=' + encodeURIComponent(state.filter.id);
     } else if (state.filter.type === 'search' || state.filter.type === 'saved_search') {
       path += '&q=' + encodeURIComponent(state.filter.query || '');
     }
     const data = await get(path);
     state.items = data.items;
     renderItems();
+  }
+
+  async function loadTags() {
+    const data = await get('tags.php');
+    state.tags = data.tags || [];
   }
 
   async function pollForUpdates() {
@@ -459,6 +467,12 @@
         setFilter({ type: 'saved_search', id: ss.id, query: ss.query });
         setPaneTitle(ss.name, null);
       }
+    } else if (persisted.type === 'tag') {
+      const tag = state.tags.find((t) => t.name === persisted.id);
+      if (tag) {
+        setFilter({ type: 'tag', id: tag.name });
+        setPaneTitle('#' + tag.name, null);
+      }
     }
   }
 
@@ -579,6 +593,7 @@
 
   const COLLAPSED_KEY = 'rss_collapsed_folders';
   const UNGROUPED_KEY = '__ungrouped__';
+  const TAGS_KEY = '__tags__';
 
   function loadCollapsedSet() {
     try {
@@ -752,6 +767,10 @@
       list.appendChild(savedSearchRow(ss));
     }
 
+    if (state.tags.length > 0) {
+      list.appendChild(tagsSectionNode());
+    }
+
     state.folders.forEach((folder, i) => {
       const feedsInFolder = orderFeedsForSidebar(state.feeds.filter((f) => f.folder_id === folder.id));
       const folderUnread = feedsInFolder.reduce((s, f) => s + (f.unread_count || 0), 0);
@@ -867,6 +886,43 @@
     }
     feedsWrap.appendChild(feedList);
     li.appendChild(feedsWrap);
+
+    return li;
+  }
+
+  function tagsSectionNode() {
+    const collapsed = state.collapsed.has(TAGS_KEY);
+
+    const li = document.createElement('li');
+    li.className = 'folder-node';
+
+    const row = document.createElement('div');
+    row.className = 'sidebar-row folder-row';
+    row.innerHTML = '<span class="name">Tags</span><span class="count"></span>';
+
+    const chevron = document.createElement('button');
+    chevron.type = 'button';
+    chevron.className = 'chevron' + (collapsed ? ' collapsed' : '');
+    chevron.setAttribute('aria-label', collapsed ? 'Expand' : 'Collapse');
+    chevron.innerHTML = CHEVRON_ICON;
+    chevron.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleCollapsed(TAGS_KEY, chevron, tagsWrap);
+    });
+    row.prepend(chevron);
+
+    li.appendChild(row);
+
+    const tagsWrap = document.createElement('div');
+    tagsWrap.className = 'folder-feeds-wrap' + (collapsed ? ' collapsed' : '');
+
+    const tagList = document.createElement('ul');
+    tagList.className = 'folder-feeds';
+    for (const tag of state.tags) {
+      tagList.appendChild(sidebarRow('#' + tag.name, tag.count, 'tag', tag.name, { badge: true }));
+    }
+    tagsWrap.appendChild(tagList);
+    li.appendChild(tagsWrap);
 
     return li;
   }
@@ -1707,6 +1763,8 @@
 
   // ---------- Rendering: reading pane ----------
 
+  let currentReadingPaneItem = null;
+
   function renderReadingPane(item) {
     const empty = document.getElementById('reading-pane-empty');
     const article = document.getElementById('reading-pane-article');
@@ -1715,6 +1773,7 @@
     // arrowing/j-k-ing through items while reading can land you mid-article
     // (or past its end) with no visual sign why.
     document.getElementById('reading-pane').scrollTop = 0;
+    currentReadingPaneItem = item || null;
     if (!item) {
       empty.hidden = false;
       article.hidden = true;
@@ -1729,6 +1788,9 @@
 
     document.getElementById('reading-pane-meta').textContent =
       (item.feed_title || '') + (item.published ? ' · ' + timeAgo(item.published) : '');
+
+    renderReadingPaneTags(item);
+    renderReadingPaneComment(item);
 
     const summaryEl = document.getElementById('reading-pane-summary');
     summaryEl.innerHTML = '';
@@ -1765,6 +1827,188 @@
       img.removeAttribute('src');
     }
   }
+
+  // Free-text tags attached to an item — shown in the reading pane, with autocomplete
+  // against tags already in use elsewhere.
+  function renderReadingPaneTags(item) {
+    const list = document.getElementById('reading-pane-tags-list');
+    list.innerHTML = '';
+    const tags = (item && item.tags) || [];
+    for (const tag of tags) {
+      const chip = document.createElement('span');
+      chip.className = 'tag-chip';
+      const label = document.createElement('span');
+      label.textContent = tag;
+      chip.appendChild(label);
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.textContent = '×';
+      removeBtn.setAttribute('aria-label', `Remove tag "${tag}"`);
+      removeBtn.addEventListener('click', () => removeReadingPaneTag(tag));
+      chip.appendChild(removeBtn);
+      list.appendChild(chip);
+    }
+  }
+
+  function closeTagSuggestMenu() {
+    document.getElementById('reading-pane-tag-suggest').hidden = true;
+  }
+
+  function positionTagSuggestMenu() {
+    const input = document.getElementById('reading-pane-tag-input');
+    const menu = document.getElementById('reading-pane-tag-suggest');
+    const rect = input.getBoundingClientRect();
+    menu.style.left = rect.left + 'px';
+    menu.style.top = (rect.bottom + 4) + 'px';
+  }
+
+  function renderTagSuggestMenu(query) {
+    const menu = document.getElementById('reading-pane-tag-suggest');
+    const item = currentReadingPaneItem;
+    const existing = new Set((item && item.tags) || []);
+    const q = query.trim().toLowerCase();
+    const matches = q === ''
+      ? []
+      : state.tags.filter((t) => !existing.has(t.name) && t.name.includes(q)).slice(0, 8);
+
+    if (matches.length === 0) {
+      closeTagSuggestMenu();
+      return;
+    }
+
+    menu.innerHTML = '';
+    for (const tag of matches) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = tag.name;
+      btn.addEventListener('click', () => addReadingPaneTag(tag.name));
+      menu.appendChild(btn);
+    }
+    positionTagSuggestMenu();
+    menu.hidden = false;
+  }
+
+  async function addReadingPaneTag(rawTag) {
+    const item = currentReadingPaneItem;
+    const tag = rawTag.trim().toLowerCase();
+    if (!item || tag === '') return;
+    const current = item.tags || [];
+    if (current.includes(tag)) return;
+    const updated = [...current, tag];
+    item.tags = updated;
+    renderReadingPaneTags(item);
+    document.getElementById('reading-pane-tag-input').value = '';
+    closeTagSuggestMenu();
+    try {
+      await post('items.php', { action: 'set_tags', feed_id: item.feed_id, item_id: item.id, tags: updated });
+      await loadTags();
+      renderSidebar();
+    } catch (e) {
+      item.tags = current;
+      renderReadingPaneTags(item);
+      toast('Failed to add tag: ' + e.message);
+    }
+  }
+
+  async function removeReadingPaneTag(tag) {
+    const item = currentReadingPaneItem;
+    if (!item) return;
+    const current = item.tags || [];
+    const updated = current.filter((t) => t !== tag);
+    item.tags = updated;
+    renderReadingPaneTags(item);
+    try {
+      await post('items.php', { action: 'set_tags', feed_id: item.feed_id, item_id: item.id, tags: updated });
+      await loadTags();
+      renderSidebar();
+    } catch (e) {
+      item.tags = current;
+      renderReadingPaneTags(item);
+      toast('Failed to remove tag: ' + e.message);
+    }
+  }
+
+  const readingPaneTagInput = document.getElementById('reading-pane-tag-input');
+  readingPaneTagInput.addEventListener('input', () => {
+    renderTagSuggestMenu(readingPaneTagInput.value);
+  });
+  readingPaneTagInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addReadingPaneTag(readingPaneTagInput.value);
+    } else if (e.key === 'Escape') {
+      closeTagSuggestMenu();
+    }
+  });
+
+  // Personal note attached to an item — shown above the article body when set.
+  function renderReadingPaneComment(item) {
+    const wrap = document.getElementById('reading-pane-comment');
+    const view = document.getElementById('reading-pane-comment-view');
+    const text = document.getElementById('reading-pane-comment-text');
+    const addBtn = document.getElementById('reading-pane-comment-add-btn');
+    document.getElementById('reading-pane-comment-edit').hidden = true;
+
+    if (item && item.comment) {
+      text.textContent = item.comment;
+      view.hidden = false;
+      addBtn.hidden = true;
+      wrap.classList.add('boxed');
+    } else {
+      view.hidden = true;
+      addBtn.hidden = false;
+      wrap.classList.remove('boxed');
+    }
+  }
+
+  function openReadingPaneCommentEditor() {
+    const item = currentReadingPaneItem;
+    if (!item) return;
+    document.getElementById('reading-pane-comment-view').hidden = true;
+    document.getElementById('reading-pane-comment-add-btn').hidden = true;
+    document.getElementById('reading-pane-comment').classList.add('boxed');
+    const editForm = document.getElementById('reading-pane-comment-edit');
+    editForm.hidden = false;
+    const input = document.getElementById('reading-pane-comment-input');
+    input.value = item.comment || '';
+    input.focus();
+  }
+
+  async function saveReadingPaneComment() {
+    const item = currentReadingPaneItem;
+    if (!item) return;
+    const comment = document.getElementById('reading-pane-comment-input').value.trim();
+    try {
+      await post('items.php', { action: 'set_comment', feed_id: item.feed_id, item_id: item.id, comment });
+      item.comment = comment || null;
+      renderReadingPaneComment(item);
+    } catch (e) {
+      toast('Failed to save note: ' + e.message);
+    }
+  }
+
+  async function deleteReadingPaneComment() {
+    const item = currentReadingPaneItem;
+    if (!item || !item.comment) return;
+    const previous = item.comment;
+    item.comment = null;
+    renderReadingPaneComment(item);
+    try {
+      await post('items.php', { action: 'set_comment', feed_id: item.feed_id, item_id: item.id, comment: '' });
+    } catch (e) {
+      item.comment = previous;
+      renderReadingPaneComment(item);
+      toast('Failed to delete note: ' + e.message);
+    }
+  }
+
+  document.getElementById('reading-pane-comment-add-btn').addEventListener('click', openReadingPaneCommentEditor);
+  document.getElementById('reading-pane-comment-edit-btn').addEventListener('click', openReadingPaneCommentEditor);
+  document.getElementById('reading-pane-comment-delete-btn').addEventListener('click', deleteReadingPaneComment);
+  document.getElementById('reading-pane-comment-save-btn').addEventListener('click', saveReadingPaneComment);
+  document.getElementById('reading-pane-comment-cancel-btn').addEventListener('click', () => {
+    renderReadingPaneComment(currentReadingPaneItem);
+  });
 
   // On phone-width screens the item list and reading pane share one column
   // (see the max-width:600px rules), so tapping an item switches to a
@@ -2184,6 +2428,8 @@
     if (!wrap.contains(e.target)) closeRefreshIntervalPopover();
     const menu = document.getElementById('feed-row-menu');
     if (!menu.contains(e.target)) closeFeedRowMenu();
+    const tagInputWrap = document.getElementById('reading-pane-tag-input-wrap');
+    if (!tagInputWrap.contains(e.target)) closeTagSuggestMenu();
   });
 
   document.getElementById('sidebar').addEventListener('scroll', () => closeFeedRowMenu());
@@ -2674,6 +2920,7 @@
   async function init() {
     await loadSettings();
     await loadFeeds();
+    await loadTags();
     restorePersistedFilter();
     renderSidebar();
     updateSortOrderButton();

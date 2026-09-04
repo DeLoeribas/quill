@@ -370,7 +370,7 @@ function item_matches_query(array $item, ?string $feedTitle, array $queryPattern
     if (empty($queryPatterns)) {
         return true;
     }
-    $haystack = fold_accents(strip_tags(($item['title'] ?? '') . ' ' . ($item['summary'] ?? '') . ' ' . ($feedTitle ?? '')));
+    $haystack = fold_accents(strip_tags(($item['title'] ?? '') . ' ' . ($item['summary'] ?? '') . ' ' . ($item['comment'] ?? '') . ' ' . ($feedTitle ?? '')));
     foreach ($queryPatterns as $pattern) {
         if (!preg_match($pattern, $haystack)) {
             return false;

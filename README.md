@@ -2,11 +2,13 @@
 
 A minimal, self-hosted RSS/Atom/JSON feed reader for one person. Plain PHP (no framework), flat JSON file storage (no database), vanilla HTML/CSS/JS (no build step).
 
+<img src="docs/screenshot.webp" alt="Quill screenshot" width="800">
+
 ## Features
 
 - Add feeds by URL, or paste a site URL and pick from its discovered feeds
 - Folders (collapsible sidebar tree), Unread and Saved views, saved searches with live match counts
-- Read/unread and starred tracking, per-feed content filters, per-feed enable/disable
+- Read/unread and starred tracking, personal notes and tags on items (tag autocomplete, browsable sidebar tag list), per-feed content filters, per-feed enable/disable
 - Manual refresh or scheduled refresh (cron/launchd/URL-based), with per-feed refresh intervals (auto-detected from feeds that declare their own, editable otherwise)
 - Favicons and item thumbnails resolved automatically, no third-party services
 - OPML import/export and full backup/restore (zip/gzip/JSON)

@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#14161a" media="(prefers-color-scheme: dark)">
 <title>Quill</title>
-<link rel="stylesheet" href="style.css?v=17">
+<link rel="stylesheet" href="style.css?v=19">
 </head>
 <body>
 <header id="app-header" hidden>
@@ -210,6 +210,30 @@
           <img id="reading-pane-image" alt="" hidden>
           <h2 id="reading-pane-title"><a id="reading-pane-link" href="#" target="_blank" rel="noopener noreferrer"></a></h2>
           <div id="reading-pane-meta" class="meta"></div>
+          <div id="reading-pane-tags" class="reading-pane-tags">
+            <div id="reading-pane-tags-list"></div>
+            <div id="reading-pane-tag-input-wrap">
+              <input id="reading-pane-tag-input" type="text" placeholder="Add tag…" autocomplete="off">
+              <div id="reading-pane-tag-suggest" class="tag-suggest-menu" hidden></div>
+            </div>
+          </div>
+          <div id="reading-pane-comment" class="reading-pane-comment">
+            <div id="reading-pane-comment-view" hidden>
+              <p id="reading-pane-comment-text"></p>
+              <div class="reading-pane-comment-actions">
+                <button id="reading-pane-comment-edit-btn" type="button" class="comment-link-btn">Edit note</button>
+                <button id="reading-pane-comment-delete-btn" type="button" class="comment-link-btn">Delete note</button>
+              </div>
+            </div>
+            <button id="reading-pane-comment-add-btn" type="button" class="comment-link-btn" hidden>+ Add a note</button>
+            <div id="reading-pane-comment-edit" hidden>
+              <textarea id="reading-pane-comment-input" rows="3" placeholder="Add a personal note about this article…"></textarea>
+              <div class="reading-pane-comment-actions">
+                <button id="reading-pane-comment-save-btn" type="button">Save</button>
+                <button id="reading-pane-comment-cancel-btn" type="button" class="comment-link-btn">Cancel</button>
+              </div>
+            </div>
+          </div>
           <div id="reading-pane-summary" class="summary"></div>
         </article>
       </section>

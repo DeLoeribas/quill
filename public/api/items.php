@@ -18,11 +18,12 @@ if ($method === 'GET') {
     $limit = isset($_GET['limit']) ? max(1, (int) $_GET['limit']) : null;
     $query = trim((string) ($_GET['q'] ?? ''));
     $queryPatterns = search_query_patterns($query);
+    $tag = strtolower(trim((string) ($_GET['tag'] ?? '')));
     $order = ($_GET['order'] ?? 'desc') === 'asc' ? 'asc' : 'desc';
 
     $feedIds = [];
-    if ($query !== '') {
-        // Global search: ignore feed/folder scoping, search every feed's items.
+    if ($query !== '' || $tag !== '') {
+        // Global search/tag browse: ignore feed/folder scoping, scan every feed's items.
         $feedIds = array_column($feedsData['feeds'], 'id');
     } elseif ($feedId !== null) {
         $feedIds = [$feedId];
@@ -44,6 +45,9 @@ if ($method === 'GET') {
                 continue;
             }
             if ($starredOnly && empty($item['starred'])) {
+                continue;
+            }
+            if ($tag !== '' && !in_array($tag, $item['tags'] ?? [], true)) {
                 continue;
             }
             $feedTitle = $feedTitleById[$fid] ?? null;
@@ -129,6 +133,81 @@ if ($method === 'POST') {
         }
 
         json_response(['ok' => true, 'updated' => $updated]);
+    }
+
+    if ($action === 'set_comment') {
+        $feedId = $body['feed_id'] ?? null;
+        $itemId = $body['item_id'] ?? null;
+        $comment = trim((string) ($body['comment'] ?? ''));
+        if (!$feedId || !$itemId) {
+            json_error('feed_id and item_id are required');
+        }
+
+        $path = items_file_path($feedId);
+        if (!is_file($path)) {
+            json_error('feed not found', 404);
+        }
+
+        $found = false;
+        Storage::update($path, ['feed_id' => $feedId, 'items' => []], function (array $data) use ($itemId, $comment, &$found) {
+            foreach ($data['items'] as $i => $item) {
+                if ($item['id'] === $itemId) {
+                    $data['items'][$i]['comment'] = $comment === '' ? null : $comment;
+                    $found = true;
+                    break;
+                }
+            }
+            return $data;
+        });
+
+        if (!$found) {
+            json_error('item not found', 404);
+        }
+
+        json_response(['ok' => true, 'comment' => $comment === '' ? null : $comment]);
+    }
+
+    if ($action === 'set_tags') {
+        $feedId = $body['feed_id'] ?? null;
+        $itemId = $body['item_id'] ?? null;
+        $rawTags = $body['tags'] ?? [];
+        if (!$feedId || !$itemId) {
+            json_error('feed_id and item_id are required');
+        }
+        if (!is_array($rawTags)) {
+            json_error('tags must be an array');
+        }
+
+        $tags = [];
+        foreach ($rawTags as $rawTag) {
+            $normalized = strtolower(trim((string) $rawTag));
+            if ($normalized !== '' && !in_array($normalized, $tags, true)) {
+                $tags[] = $normalized;
+            }
+        }
+
+        $path = items_file_path($feedId);
+        if (!is_file($path)) {
+            json_error('feed not found', 404);
+        }
+
+        $found = false;
+        Storage::update($path, ['feed_id' => $feedId, 'items' => []], function (array $data) use ($itemId, $tags, &$found) {
+            foreach ($data['items'] as $i => $item) {
+                if ($item['id'] === $itemId) {
+                    $data['items'][$i]['tags'] = $tags;
+                    $found = true;
+                    break;
+                }
+            }
+            return $data;
+        });
+
+        if (!$found) {
+            json_error('item not found', 404);
+        }
+
+        json_response(['ok' => true, 'tags' => $tags]);
     }
 
     if ($action === 'mark_all_read') {
