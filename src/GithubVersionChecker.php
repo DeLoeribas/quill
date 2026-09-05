@@ -9,23 +9,20 @@ final class GithubVersionChecker
     /**
      * Returns the latest GitHub tag if $currentVersion is behind it, or null if it's
      * current, unknown, or GitHub couldn't be reached. $currentVersion is APP_VERSION —
-     * either a plain semver tag (e.g. "1.2.0"), a git-describe string past a tag (e.g.
-     * "1.2.0-3-gabc1234"), a bare commit hash (no tags pushed yet), or "dev" (local,
-     * unpackaged). Only the first two carry a comparable semver prefix.
+     * either a plain tag (e.g. "1.2.0") or "dev" (no tags yet, or a local unpackaged run).
      */
     public static function updateAvailable(string $currentVersion): ?string
     {
-        if (!preg_match('/^\d+(\.\d+){0,2}/', $currentVersion, $m)) {
+        if ($currentVersion === 'dev') {
             return null;
         }
-        $currentBase = $m[0];
 
         $latest = self::latestTag();
         if ($latest === null) {
             return null;
         }
 
-        return version_compare($currentBase, $latest, '<') ? $latest : null;
+        return version_compare($currentVersion, $latest, '<') ? $latest : null;
     }
 
     private static function latestTag(): ?string

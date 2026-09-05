@@ -164,7 +164,7 @@ Cron output counts these separately as `deferred=`, so absorbed failures never i
    ```
    bin/package-for-deploy.sh
    ```
-   which uses `git archive` to build a clean copy in `./deploy/` containing only what's tracked in git — no personal data, ever. It also stamps `deploy/src/version.php` with `git describe --tags --always` for the commit being packaged (shown in the app's footer — see "Versioning" below), and creates `deploy/src/config.php` from `config.sample.php` for you, with `CRON_TOKEN` left blank — the script prints a reminder to generate one yourself and set it in that file before uploading if you want scheduled refresh via `public/cron.php` (see "Scheduled refresh" → Option A below); store the generated value somewhere safe, since it can't be recovered from the server afterwards. Upload the contents of `./deploy/`. Point the site's **document root** at `public/` if your host allows it — this keeps `src/` and `data/` outside the web-exposed folder entirely, which is the safest setup.
+   which uses `git archive` to build a clean copy in `./deploy/` containing only what's tracked in git — no personal data, ever. It also stamps `deploy/src/version.php` with `git describe --tags --abbrev=0` for the commit being packaged (shown in the app's footer — see "Versioning" below), and creates `deploy/src/config.php` from `config.sample.php` for you, with `CRON_TOKEN` left blank — the script prints a reminder to generate one yourself and set it in that file before uploading if you want scheduled refresh via `public/cron.php` (see "Scheduled refresh" → Option A below); store the generated value somewhere safe, since it can't be recovered from the server afterwards. Upload the contents of `./deploy/`. Point the site's **document root** at `public/` if your host allows it — this keeps `src/` and `data/` outside the web-exposed folder entirely, which is the safest setup.
 2. If your host only exposes a single folder (e.g. `public_html` *is* the repo root, `public/` can't be the doc root), the `.htaccess` files in `data/` and `src/` deny all direct requests to those folders as a fallback — but a document root above the repo is still preferable when available.
 3. **Optionally, also protect the site with HTTP Basic Auth** as an extra layer in front of the app's own login (step 4 below is what actually keeps strangers out on its own — this is defense-in-depth on top of that, and is disabled by default). `public/.htaccess` ships with the relevant lines commented out:
    ```
@@ -183,16 +183,16 @@ Cron output counts these separately as `deferred=`, so absorbed failures never i
 
 ## Versioning
 
-The app's footer shows a version, e.g. `v1.0.0` or `va1b2c3d`. There's no hand-maintained version constant — each run of `bin/package-for-deploy.sh` stamps `src/version.php` with `git describe --tags --always` for whatever commit it's archiving at that moment, so it's always accurate to what's actually deployed even though every install is packaged and uploaded independently. Running the app locally (unpackaged) shows `vdev`, since `src/version.php` only ever exists inside a packaged copy.
+The app's footer shows a version, e.g. `v1.0.0` or `vdev`. There's no hand-maintained version constant — each run of `bin/package-for-deploy.sh` stamps `src/version.php` with `git describe --tags --abbrev=0` for whatever commit it's archiving at that moment, so it's always accurate to what's actually deployed even though every install is packaged and uploaded independently. Running the app locally (unpackaged) also shows `vdev`, since `src/version.php` only ever exists inside a packaged copy.
 
-With no tags yet, `git describe` falls back to a short commit hash. To get real version numbers instead, tag a release (without a `v` prefix — the footer already adds one):
+With no tags yet, `git describe` has nothing to abbreviate and falls back to `dev`. To get real version numbers instead, tag a release (without a `v` prefix — the footer already adds one):
 
 ```
 git tag -a 1.0.0 -m "1.0.0"
 git push origin 1.0.0
 ```
 
-The next `bin/package-for-deploy.sh` run on that commit will then stamp `1.0.0` instead of a hash; a few commits past a tag it'll read something like `1.0.0-3-gabc1234` (3 commits after the `1.0.0` tag, at commit `abc1234`).
+The next `bin/package-for-deploy.sh` run on that commit will then stamp `1.0.0` — and it keeps reading `1.0.0` for any later commit until the next tag, since `--abbrev=0` only ever gives the nearest reachable tag name, never a commit-count/hash suffix.
 
 The footer also checks GitHub for a newer tagged release than the one deployed (cached server-side for up to `GITHUB_VERSION_CACHE_SECONDS`, 6 hours by default). When the deployed version is behind, an "Update available: vX.Y.Z" badge appears linking to the repo's tags page — it stays hidden otherwise (including on an untagged/`dev` build, since there's nothing meaningful to compare).
 
