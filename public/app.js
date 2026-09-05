@@ -594,6 +594,7 @@
   const COLLAPSED_KEY = 'rss_collapsed_folders';
   const UNGROUPED_KEY = '__ungrouped__';
   const TAGS_KEY = '__tags__';
+  const SAVED_SEARCHES_KEY = '__saved_searches__';
 
   function loadCollapsedSet() {
     try {
@@ -763,8 +764,8 @@
       list.appendChild(sidebarRow('Saved', starred, 'starred', null, { badge: true, icon: BOOKMARK_FILLED_ICON }));
     }
 
-    for (const ss of state.savedSearches) {
-      list.appendChild(savedSearchRow(ss));
+    if (state.savedSearches.length > 0) {
+      list.appendChild(savedSearchesSectionNode());
     }
 
     if (state.tags.length > 0) {
@@ -886,6 +887,43 @@
     }
     feedsWrap.appendChild(feedList);
     li.appendChild(feedsWrap);
+
+    return li;
+  }
+
+  function savedSearchesSectionNode() {
+    const collapsed = state.collapsed.has(SAVED_SEARCHES_KEY);
+
+    const li = document.createElement('li');
+    li.className = 'folder-node';
+
+    const row = document.createElement('div');
+    row.className = 'sidebar-row folder-row';
+    row.innerHTML = '<span class="name">Saved Searches</span><span class="count"></span>';
+
+    const chevron = document.createElement('button');
+    chevron.type = 'button';
+    chevron.className = 'chevron' + (collapsed ? ' collapsed' : '');
+    chevron.setAttribute('aria-label', collapsed ? 'Expand' : 'Collapse');
+    chevron.innerHTML = CHEVRON_ICON;
+    chevron.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleCollapsed(SAVED_SEARCHES_KEY, chevron, savedSearchesWrap);
+    });
+    row.prepend(chevron);
+
+    li.appendChild(row);
+
+    const savedSearchesWrap = document.createElement('div');
+    savedSearchesWrap.className = 'folder-feeds-wrap' + (collapsed ? ' collapsed' : '');
+
+    const savedSearchList = document.createElement('ul');
+    savedSearchList.className = 'folder-feeds';
+    for (const ss of state.savedSearches) {
+      savedSearchList.appendChild(savedSearchRow(ss));
+    }
+    savedSearchesWrap.appendChild(savedSearchList);
+    li.appendChild(savedSearchesWrap);
 
     return li;
   }
