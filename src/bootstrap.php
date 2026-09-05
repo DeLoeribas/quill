@@ -215,9 +215,9 @@ if (file_exists(__DIR__ . '/version.php')) {
     define('APP_VERSION', 'dev');
 }
 
-// Fallback defaults for GithubVersionChecker's config, in case config.php predates
-// this feature — an in-place code update never touches the live config.php (see
-// config.sample.php), so a missing constant here must not be a fatal error.
+// Fallback defaults for constants added to config.sample.php after this app's
+// first release — an in-place code update never touches the live config.php (see
+// config.sample.php), so a config.php predating a feature must not be a fatal error.
 if (!defined('GITHUB_REPO')) {
     define('GITHUB_REPO', 'DeLoeribas/quill');
 }
@@ -226,6 +226,12 @@ if (!defined('GITHUB_VERSION_CACHE_FILE')) {
 }
 if (!defined('GITHUB_VERSION_CACHE_SECONDS')) {
     define('GITHUB_VERSION_CACHE_SECONDS', 6 * 3600);
+}
+if (!defined('FETCH_RETRY_ATTEMPTS')) {
+    define('FETCH_RETRY_ATTEMPTS', 3);
+}
+if (!defined('FETCH_TRANSIENT_TOLERANCE')) {
+    define('FETCH_TRANSIENT_TOLERANCE', 3);
 }
 
 function read_items_file(string $feedId): array

@@ -148,6 +148,16 @@ launchctl unload ~/Library/LaunchAgents/com.example.quill.refresh.plist
 launchctl load ~/Library/LaunchAgents/com.example.quill.refresh.plist
 ```
 
+### Transient failures and retries
+
+Not every failed fetch means a broken feed. A connection error, or an HTTP 408/425/429/5xx, is retried within the same refresh — `FETCH_RETRY_ATTEMPTS` attempts in total (3 by default), with a short linear backoff between them. In a bulk refresh each retry round re-fetches only the feeds that failed, again concurrently, so the extra cost is one round trip per round rather than one per failed feed.
+
+YouTube gets one extra rule: its feed endpoint (`youtube.com/feeds/videos.xml`) regularly answers **404 for channel ids that are perfectly valid**, in bursts lasting minutes, then serves them again as if nothing happened — its own "YouTube RSS Feeds server" returns the error, so a 404 from there says nothing about whether the channel exists. Those 404s are therefore treated as transient too. A 404 from any other host still means the feed is gone and is reported immediately, and this doesn't mask a mistyped YouTube URL either: a `/feeds/videos.xml` URL is only ever produced by `YouTubeResolver` from a channel that already resolved successfully.
+
+Because those bursts routinely outlast the in-request retries, a transient failure is also *absorbed* rather than shown: for the first `FETCH_TRANSIENT_TOLERANCE` failures in a row (3 by default) the feed keeps its previous status — no error badge in the sidebar — and keeps its previous `last_fetched`, so it stays due and the very next refresh retries it instead of waiting out a full refresh interval. Once the tolerance is exceeded, it becomes a normal error: badge shown, and back on the regular schedule so a permanently dead host isn't hammered every tick. Any successful fetch (including a `304`) resets the counter.
+
+Cron output counts these separately as `deferred=`, so absorbed failures never inflate `refreshed=`. A manual per-feed refresh still tells you what happened ("didn't respond — will retry") rather than claiming the feed is up to date.
+
 ## Deploying to shared PHP hosting
 
 1. **Don't upload your working copy directly** (Finder/rsync/scp of this whole folder) — it has your real `data/feeds.json`, `data/auth.json`, `data/items/`, logs, and `src/config.php` sitting on disk locally, all of which are gitignored precisely so they never get uploaded by accident. Instead run:

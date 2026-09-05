@@ -19,6 +19,19 @@ define('FETCH_USER_AGENT', 'Quill/1.0 (+local)');
 // How many feeds RefreshService::refreshAll() fetches concurrently via curl_multi.
 define('FETCH_CONCURRENCY', 8);
 
+// Total attempts (not extra retries) per feed when a fetch fails transiently —
+// a connection error, or a 5xx/429/408 from the server. YouTube's feed endpoint
+// also 404s at random for valid channels, which counts as transient too. 1
+// disables retrying.
+define('FETCH_RETRY_ATTEMPTS', 3);
+
+// How many refreshes in a row may fail transiently before the feed is actually
+// shown as broken in the sidebar. Below this, the failure is silent and the feed
+// stays due, so the next refresh retries it right away instead of waiting out a
+// whole refresh interval — YouTube's 404 bursts routinely outlast the in-request
+// retries above.
+define('FETCH_TRANSIENT_TOLERANCE', 3);
+
 // Repo the footer checks for a newer tagged release than APP_VERSION, and how often
 // (seconds) to re-check — result is cached in GITHUB_VERSION_CACHE_FILE between checks.
 define('GITHUB_REPO', 'DeLoeribas/quill');

@@ -70,13 +70,7 @@ final class RefreshService
         $feedId = $feed['id'];
 
         if ($result->error !== null) {
-            self::updateFeedMeta($feedId, function (array $f) use ($result) {
-                $f['last_fetched'] = now_iso8601();
-                $f['last_status'] = 'error';
-                $f['last_error'] = $result->error;
-                return $f;
-            });
-            return ['status' => 'error', 'new_items' => 0, 'error' => $result->error];
+            return self::recordFailure($feed, $result, $result->error);
         }
 
         if ($result->httpCode === 304) {
@@ -88,6 +82,7 @@ final class RefreshService
                 $f['last_fetched'] = now_iso8601();
                 $f['last_status'] = 'ok';
                 $f['last_error'] = null;
+                $f['consecutive_failures'] = 0;
                 if ($faviconUrl !== null && empty($f['favicon_url'])) {
                     $f['favicon_url'] = $faviconUrl;
                 }
@@ -97,14 +92,7 @@ final class RefreshService
         }
 
         if ($result->httpCode < 200 || $result->httpCode >= 300 || $result->body === null) {
-            $error = 'HTTP ' . $result->httpCode;
-            self::updateFeedMeta($feedId, function (array $f) use ($error) {
-                $f['last_fetched'] = now_iso8601();
-                $f['last_status'] = 'error';
-                $f['last_error'] = $error;
-                return $f;
-            });
-            return ['status' => 'error', 'new_items' => 0, 'error' => $error];
+            return self::recordFailure($feed, $result, 'HTTP ' . $result->httpCode);
         }
 
         $parsed = FeedFetcher::parse($result->body);
@@ -130,6 +118,7 @@ final class RefreshService
             $f['last_fetched'] = now_iso8601();
             $f['last_status'] = 'ok';
             $f['last_error'] = null;
+            $f['consecutive_failures'] = 0;
             $f['etag'] = $result->etag;
             $f['last_modified'] = $result->lastModified;
 
@@ -158,6 +147,48 @@ final class RefreshService
         });
 
         return ['status' => 'ok', 'new_items' => $newItemCount, 'error' => null];
+    }
+
+    /**
+     * Records a failed fetch against the feed.
+     *
+     * A transient failure (a connection error, a 5xx, or one of YouTube's
+     * random 404s — see FeedFetcher::isTransientFailure) is absorbed rather
+     * than surfaced for the first FETCH_TRANSIENT_TOLERANCE attempts in a row:
+     * the feed keeps its previous status and, crucially, keeps its previous
+     * last_fetched, so isDue() still considers it due and the very next refresh
+     * retries it instead of waiting out a whole refresh interval. YouTube's 404
+     * bursts last minutes, well past what FeedFetcher's in-request retries can
+     * ride out, but they clear long before the next hourly refresh would.
+     *
+     * Anything else — and any transient failure that keeps happening — is a
+     * real error: it's shown in the sidebar and the feed goes back to its
+     * normal schedule so a permanently broken host isn't retried every tick.
+     *
+     * @return array{status:string, new_items:int, error:?string}
+     */
+    private static function recordFailure(array $feed, FeedFetchResult $result, string $error): array
+    {
+        $failures = (int) ($feed['consecutive_failures'] ?? 0) + 1;
+        $soft = FeedFetcher::isTransientFailure($result, $feed['url'])
+            && $failures < FETCH_TRANSIENT_TOLERANCE;
+
+        self::updateFeedMeta($feed['id'], function (array $f) use ($error, $failures, $soft) {
+            $f['consecutive_failures'] = $failures;
+            if ($soft) {
+                return $f;
+            }
+            $f['last_fetched'] = now_iso8601();
+            $f['last_status'] = 'error';
+            $f['last_error'] = $error;
+            return $f;
+        });
+
+        return [
+            'status' => $soft ? 'transient_error' : 'error',
+            'new_items' => 0,
+            'error' => $error,
+        ];
     }
 
     /**

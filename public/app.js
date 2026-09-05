@@ -1162,6 +1162,11 @@
       const outcome = result.results[0];
       if (outcome.status === 'error') {
         toast(`Failed to refresh "${name}": ` + outcome.error);
+      } else if (outcome.status === 'transient_error') {
+        // The server absorbed this one rather than marking the feed broken (it
+        // stays due, so the next refresh retries it) — but on a manual refresh
+        // the user is watching, so say what happened instead of "up to date".
+        toast(`"${name}" didn't respond (${outcome.error}) — will retry`);
       } else {
         toast(outcome.new_items ? `"${name}": ${outcome.new_items} new item${outcome.new_items === 1 ? '' : 's'}` : `"${name}" is up to date`);
       }

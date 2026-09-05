@@ -31,12 +31,17 @@ $refreshed = 0;
 $skipped = 0;
 $disabled = 0;
 $errors = 0;
+// Feeds whose fetch failed transiently and hasn't been given up on yet — they
+// keep their previous status and stay due, so the next run retries them.
+$deferred = 0;
 
 foreach ($results as $outcome) {
     if ($outcome['status'] === 'disabled') {
         $disabled++;
     } elseif ($outcome['status'] === 'skipped') {
         $skipped++;
+    } elseif ($outcome['status'] === 'transient_error') {
+        $deferred++;
     } elseif ($outcome['status'] === 'error') {
         $errors++;
     } else {
@@ -45,11 +50,12 @@ foreach ($results as $outcome) {
 }
 
 $line = sprintf(
-    "[%s] refreshed=%d skipped=%d disabled=%d errors=%d\n",
+    "[%s] refreshed=%d skipped=%d disabled=%d deferred=%d errors=%d\n",
     now_iso8601(),
     $refreshed,
     $skipped,
     $disabled,
+    $deferred,
     $errors
 );
 cap_log_file(CRON_LOG_FILE, CRON_LOG_MAX_BYTES);
@@ -60,5 +66,6 @@ json_response([
     'refreshed' => $refreshed,
     'skipped' => $skipped,
     'disabled' => $disabled,
+    'deferred' => $deferred,
     'errors' => $errors,
 ]);
