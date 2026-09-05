@@ -7,7 +7,7 @@ A minimal, self-hosted RSS/Atom/JSON feed reader for one person. Plain PHP (no f
 ## Features
 
 - Add feeds by URL, or paste a site URL and pick from its discovered feeds
-- Folders (collapsible sidebar tree), Unread and Saved views, saved searches with live match counts
+- Folders (collapsible sidebar tree), Unread and Saved views, saved searches with live match counts in their own collapsible sidebar group
 - Read/unread and starred tracking, personal notes and tags on items (tag autocomplete, browsable sidebar tag list), per-feed content filters, per-feed enable/disable
 - Manual refresh or scheduled refresh (cron/launchd/URL-based), with per-feed refresh intervals (auto-detected from feeds that declare their own, editable otherwise)
 - Favicons and item thumbnails resolved automatically, no third-party services
