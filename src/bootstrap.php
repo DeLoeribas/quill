@@ -491,3 +491,15 @@ function starred_count_for(string $feedId): int
     }
     return $count;
 }
+
+function note_count_for(string $feedId): int
+{
+    $itemsData = read_items_file($feedId);
+    $count = 0;
+    foreach ($itemsData['items'] as $item) {
+        if (!empty($item['comment'])) {
+            $count++;
+        }
+    }
+    return $count;
+}

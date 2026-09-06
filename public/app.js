@@ -16,6 +16,7 @@
   const BOOKMARK_FILLED_ICON = '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21 12 16l-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>';
   const ALL_ITEMS_ICON = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/></svg>';
   const UNREAD_ICON = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"/></svg>';
+  const NOTE_ICON = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16v16H4z"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="12" y2="17"/></svg>';
   // chevron.right shape; rotated -90deg via .chevron.collapsed in CSS to read as chevron.down when expanded
   const CHEVRON_ICON = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>';
   const REFRESH_INTERVAL_PRESETS = [15, 30, 60, 120, 240, 360, 720, 1440];
@@ -248,6 +249,8 @@
       path += '&unread_only=1';
     } else if (state.filter.type === 'starred') {
       path += '&starred_only=1';
+    } else if (state.filter.type === 'note') {
+      path += '&has_note=1';
     } else if (state.filter.type === 'tag') {
       path += '&tag=' + encodeURIComponent(state.filter.id);
     } else if (state.filter.type === 'search' || state.filter.type === 'saved_search') {
@@ -284,6 +287,10 @@
 
   function totalItems() {
     return state.feeds.reduce((sum, f) => sum + (f.item_count || 0), 0);
+  }
+
+  function totalNotes() {
+    return state.feeds.reduce((sum, f) => sum + (f.note_count || 0), 0);
   }
 
   function totalStarred() {
@@ -448,6 +455,11 @@
       if (totalStarred() > 0) {
         setFilter({ type: 'starred', id: null });
         setPaneTitle('Saved', null);
+      }
+    } else if (persisted.type === 'note') {
+      if (totalNotes() > 0) {
+        setFilter({ type: 'note', id: null });
+        setPaneTitle('Notes', null);
       }
     } else if (persisted.type === 'folder') {
       if (persisted.id === null) {
@@ -768,6 +780,11 @@
     const starred = totalStarred();
     if (starred > 0) {
       list.appendChild(sidebarRow('Saved', starred, 'starred', null, { badge: true, icon: BOOKMARK_FILLED_ICON }));
+    }
+
+    const notes = totalNotes();
+    if (notes > 0) {
+      list.appendChild(sidebarRow('Notes', notes, 'note', null, { badge: true, icon: NOTE_ICON }));
     }
 
     if (state.savedSearches.length > 0) {
@@ -1813,6 +1830,25 @@
   // ---------- Rendering: reading pane ----------
 
   let currentReadingPaneItem = null;
+  const pendingSummaryFetches = new WeakSet();
+
+  async function ensureItemSummary(item) {
+    if (item.summary !== undefined || pendingSummaryFetches.has(item)) return;
+    pendingSummaryFetches.add(item);
+    try {
+      const data = await get('items.php?item_id=' + encodeURIComponent(item.id) + '&feed_id=' + encodeURIComponent(item.feed_id));
+      // Merge only `summary` — not the whole record — so this can't clobber a
+      // read/star/tag/comment change that landed while the fetch was in flight.
+      item.summary = data.item.summary;
+      if (currentReadingPaneItem === item) {
+        renderReadingPane(item);
+      }
+    } catch (e) {
+      // Best-effort: leave summary undefined so reopening the item retries.
+    } finally {
+      pendingSummaryFetches.delete(item);
+    }
+  }
 
   function renderReadingPane(item) {
     const empty = document.getElementById('reading-pane-empty');
@@ -1844,7 +1880,12 @@
     const summaryEl = document.getElementById('reading-pane-summary');
     summaryEl.innerHTML = '';
     let summaryHasImage = false;
-    if (item.summary) {
+    if (item.summary === undefined) {
+      // The list response omits `summary` (often many KB of raw article HTML) to
+      // keep it small; fetch the one item's full record on demand instead.
+      summaryEl.textContent = 'Loading…';
+      ensureItemSummary(item);
+    } else if (item.summary) {
       const rendered = sanitizeHtml(item.summary);
       highlightMatches(rendered, currentSearchQueryWords());
       summaryHasImage = !!rendered.querySelector('img');
@@ -2027,10 +2068,19 @@
     const item = currentReadingPaneItem;
     if (!item) return;
     const comment = document.getElementById('reading-pane-comment-input').value.trim();
+    const hadComment = !!item.comment;
+    const willHaveComment = !!comment;
     try {
       await post('items.php', { action: 'set_comment', feed_id: item.feed_id, item_id: item.id, comment });
       item.comment = comment || null;
       renderReadingPaneComment(item);
+      if (hadComment !== willHaveComment) {
+        const feed = state.feeds.find((f) => f.id === item.feed_id);
+        if (feed) {
+          feed.note_count = Math.max(0, (feed.note_count || 0) + (willHaveComment ? 1 : -1));
+        }
+        renderSidebar();
+      }
     } catch (e) {
       toast('Failed to save note: ' + e.message);
     }
@@ -2042,11 +2092,20 @@
     const previous = item.comment;
     item.comment = null;
     renderReadingPaneComment(item);
+    const feed = state.feeds.find((f) => f.id === item.feed_id);
+    if (feed) {
+      feed.note_count = Math.max(0, (feed.note_count || 0) - 1);
+    }
+    renderSidebar();
     try {
       await post('items.php', { action: 'set_comment', feed_id: item.feed_id, item_id: item.id, comment: '' });
     } catch (e) {
       item.comment = previous;
       renderReadingPaneComment(item);
+      if (feed) {
+        feed.note_count = (feed.note_count || 0) + 1;
+      }
+      renderSidebar();
       toast('Failed to delete note: ' + e.message);
     }
   }
@@ -2649,6 +2708,8 @@
 
   let resizeStartX = 0;
   let resizeStartWidth = 0;
+  let sidebarResizeRAF = null;
+  let pendingSidebarClientX = null;
 
   function persistSidebarWidth(px) {
     try {
@@ -2671,11 +2732,20 @@
 
   sidebarResizer.addEventListener('pointermove', (e) => {
     if (!sidebarResizer.hasPointerCapture(e.pointerId)) return;
-    state.sidebarWidth = applySidebarWidth(resizeStartWidth + (e.clientX - resizeStartX));
+    pendingSidebarClientX = e.clientX;
+    if (sidebarResizeRAF) return;
+    sidebarResizeRAF = requestAnimationFrame(() => {
+      sidebarResizeRAF = null;
+      state.sidebarWidth = applySidebarWidth(resizeStartWidth + (pendingSidebarClientX - resizeStartX));
+    });
   });
 
   function endSidebarResize(e) {
     if (!sidebarResizer.hasPointerCapture(e.pointerId)) return;
+    if (sidebarResizeRAF) {
+      cancelAnimationFrame(sidebarResizeRAF);
+      sidebarResizeRAF = null;
+    }
     sidebarResizer.releasePointerCapture(e.pointerId);
     sidebarResizer.classList.remove('resizing');
     document.body.classList.remove('resizing-sidebar');
@@ -2691,6 +2761,8 @@
 
   let readingResizeStartX = 0;
   let readingResizeStartWidth = 0;
+  let readingResizeRAF = null;
+  let pendingReadingClientX = null;
 
   function persistItemPaneWidth(px) {
     try {
@@ -2713,11 +2785,20 @@
 
   readingPaneResizer.addEventListener('pointermove', (e) => {
     if (!readingPaneResizer.hasPointerCapture(e.pointerId)) return;
-    state.itemPaneWidth = applyItemPaneWidth(readingResizeStartWidth + (e.clientX - readingResizeStartX));
+    pendingReadingClientX = e.clientX;
+    if (readingResizeRAF) return;
+    readingResizeRAF = requestAnimationFrame(() => {
+      readingResizeRAF = null;
+      state.itemPaneWidth = applyItemPaneWidth(readingResizeStartWidth + (pendingReadingClientX - readingResizeStartX));
+    });
   });
 
   function endReadingPaneResize(e) {
     if (!readingPaneResizer.hasPointerCapture(e.pointerId)) return;
+    if (readingResizeRAF) {
+      cancelAnimationFrame(readingResizeRAF);
+      readingResizeRAF = null;
+    }
     readingPaneResizer.releasePointerCapture(e.pointerId);
     readingPaneResizer.classList.remove('resizing');
     document.body.classList.remove('resizing-reading-pane');

@@ -111,13 +111,23 @@ body {
 #app-header h1 {
   display: flex;
   align-items: center;
+  margin: 0;
+  white-space: nowrap;
+}
+
+#app-header h1 a {
+  display: flex;
+  align-items: center;
   gap: 6px;
   font-size: 21px;
   font-weight: 700;
   letter-spacing: -0.01em;
   color: var(--accent);
-  margin: 0;
-  white-space: nowrap;
+  text-decoration: none;
+}
+
+#app-header h1 a:hover {
+  text-decoration: underline;
 }
 
 .app-title-icon {
@@ -272,6 +282,13 @@ body.resizing-sidebar {
   user-select: none;
 }
 
+/* Drop the width/padding easing while actively dragging so the sidebar snaps
+   to the cursor instead of chasing it; the collapse/expand animation still
+   applies normally once this class is removed. */
+body.resizing-sidebar #sidebar {
+  transition: filter 0.15s ease;
+}
+
 #sidebar, #item-pane, #reading-pane {
   transition: filter 0.15s ease;
 }
@@ -316,7 +333,7 @@ body.resizing-sidebar {
 }
 
 .folder-node {
-  margin-bottom: 2px;
+  margin: 1px 0 2px;
 }
 
 .sidebar-row {
@@ -403,7 +420,18 @@ body.resizing-sidebar {
   letter-spacing: 0.04em;
   color: var(--muted);
   padding-left: 8px;
-  background: var(--folder-bg);
+}
+
+.sidebar-row.folder-row:hover:not(.active) {
+  background: none;
+}
+
+.sidebar-row.folder-row .chevron {
+  opacity: 0.55;
+}
+
+.sidebar-row.folder-row:hover .chevron {
+  opacity: 1;
 }
 
 .sidebar-row.folder-row.active {

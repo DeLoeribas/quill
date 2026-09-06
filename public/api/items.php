@@ -11,10 +11,31 @@ if ($method === 'GET') {
     $feedsData = Storage::read(FEEDS_FILE, ['folders' => [], 'feeds' => []]);
     $feedTitleById = array_column($feedsData['feeds'], 'title', 'id');
 
+    // Single-item detail fetch: the list branch below strips `summary` (often many
+    // KB of raw article HTML) to keep the list response small, so the reading pane
+    // asks for one item's full record on demand via this path instead.
+    $itemIdParam = $_GET['item_id'] ?? null;
+    if ($itemIdParam !== null) {
+        $detailFeedId = $_GET['feed_id'] ?? null;
+        if ($detailFeedId === null) {
+            json_error('feed_id is required');
+        }
+        $itemsData = read_items_file($detailFeedId);
+        foreach ($itemsData['items'] as $item) {
+            if ($item['id'] === $itemIdParam) {
+                $item['feed_id'] = $detailFeedId;
+                $item['feed_title'] = $feedTitleById[$detailFeedId] ?? null;
+                json_response(['item' => $item]);
+            }
+        }
+        json_error('item not found', 404);
+    }
+
     $feedId = $_GET['feed_id'] ?? null;
     $folderId = $_GET['folder_id'] ?? null;
     $unreadOnly = !empty($_GET['unread_only']);
     $starredOnly = !empty($_GET['starred_only']);
+    $noteOnly = !empty($_GET['has_note']);
     $limit = isset($_GET['limit']) ? max(1, (int) $_GET['limit']) : null;
     $query = trim((string) ($_GET['q'] ?? ''));
     $queryPatterns = search_query_patterns($query);
@@ -47,6 +68,9 @@ if ($method === 'GET') {
             if ($starredOnly && empty($item['starred'])) {
                 continue;
             }
+            if ($noteOnly && empty($item['comment'])) {
+                continue;
+            }
             if ($tag !== '' && !in_array($tag, $item['tags'] ?? [], true)) {
                 continue;
             }
@@ -56,6 +80,7 @@ if ($method === 'GET') {
             }
             $item['feed_id'] = $fid;
             $item['feed_title'] = $feedTitle;
+            unset($item['summary']);
             $items[] = $item;
         }
     }
