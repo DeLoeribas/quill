@@ -218,8 +218,13 @@
 
   // ---------- Data loading ----------
 
+  let feedsRequestSeq = 0;      // monotonically increasing id per loadFeeds() call
+  let pendingReadMutations = 0; // count of in-flight mark-read/unread/star POSTs
+
   async function loadFeeds() {
+    const seq = ++feedsRequestSeq;
     const data = await get('feeds.php');
+    if (seq !== feedsRequestSeq) return; // a newer loadFeeds() superseded this one
     state.folders = data.folders;
     state.feeds = data.feeds;
     state.savedSearches = data.saved_searches || [];
@@ -261,6 +266,7 @@
   async function pollForUpdates() {
     if (document.hidden) return;
     if (!document.getElementById('settings-overlay').hidden) return;
+    if (pendingReadMutations > 0) return;
     try {
       // Only refresh sidebar counts/badges — never the item list itself, so
       // an item you're mid-way through reading (e.g. an expanded summary
@@ -2180,6 +2186,7 @@
     const feed = state.feeds.find((f) => f.id === item.feed_id);
     if (feed && feed.unread_count > 0) feed.unread_count--;
     renderSidebar();
+    pendingReadMutations++;
     try {
       await post('items.php', { action: 'mark_read', item_ids: [item.id] });
     } catch (e) {
@@ -2189,6 +2196,11 @@
       if (feed) feed.unread_count++;
       renderSidebar();
       toast('Failed to mark read: ' + e.message);
+    } finally {
+      pendingReadMutations--;
+      if (pendingReadMutations === 0) {
+        loadFeeds().catch(() => {}); // reconcile promptly instead of waiting for next poll
+      }
     }
   }
 
@@ -2210,6 +2222,7 @@
       feed.unread_count = Math.max(0, (feed.unread_count || 0) + (nowRead ? -1 : 1));
     }
     renderSidebar();
+    pendingReadMutations++;
     try {
       await post('items.php', { action: nowRead ? 'mark_read' : 'mark_unread', item_ids: [item.id] });
     } catch (e) {
@@ -2221,6 +2234,11 @@
       }
       renderSidebar();
       toast('Failed to update read status: ' + e.message);
+    } finally {
+      pendingReadMutations--;
+      if (pendingReadMutations === 0) {
+        loadFeeds().catch(() => {}); // reconcile promptly instead of waiting for next poll
+      }
     }
   }
 
@@ -2242,6 +2260,7 @@
       feed.starred_count = Math.max(0, (feed.starred_count || 0) + (nowStarred ? 1 : -1));
     }
     renderSidebar();
+    pendingReadMutations++;
     try {
       await post('items.php', { action: nowStarred ? 'star' : 'unstar', item_ids: [item.id] });
     } catch (e) {
@@ -2253,6 +2272,11 @@
       }
       renderSidebar();
       toast('Failed to update starred status: ' + e.message);
+    } finally {
+      pendingReadMutations--;
+      if (pendingReadMutations === 0) {
+        loadFeeds().catch(() => {}); // reconcile promptly instead of waiting for next poll
+      }
     }
   }
 
