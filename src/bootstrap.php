@@ -277,6 +277,10 @@ function sanitize_ui_prefs(array $prefs): array
         $out['sort_feeds_alphabetically'] = $prefs['sort_feeds_alphabetically'];
     }
 
+    if (isset($prefs['mark_read_on_nav']) && is_bool($prefs['mark_read_on_nav'])) {
+        $out['mark_read_on_nav'] = $prefs['mark_read_on_nav'];
+    }
+
     if (isset($prefs['sidebar_collapsed']) && is_bool($prefs['sidebar_collapsed'])) {
         $out['sidebar_collapsed'] = $prefs['sidebar_collapsed'];
     }

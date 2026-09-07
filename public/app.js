@@ -26,6 +26,7 @@
   const SORT_ORDER_KEY = 'rss_sort_order';
   const SORT_ORDER_UNREAD_KEY = 'rss_sort_order_unread';
   const SORT_FEEDS_ALPHA_KEY = 'rss_sort_feeds_alpha';
+  const MARK_READ_ON_NAV_KEY = 'rss_mark_read_on_nav';
   const BASE_TITLE = document.title;
 
   const state = {
@@ -45,6 +46,7 @@
     sortOrder: 'desc',
     sortOrderUnread: 'desc',
     sortFeedsAlphabetically: false,
+    markReadOnNav: false,
     pane: 'items',
     paneFeed: null,
   };
@@ -540,6 +542,9 @@
     if (typeof prefs.sort_feeds_alphabetically === 'boolean') {
       state.sortFeedsAlphabetically = prefs.sort_feeds_alphabetically;
     }
+    if (typeof prefs.mark_read_on_nav === 'boolean') {
+      state.markReadOnNav = prefs.mark_read_on_nav;
+    }
     if (Number.isInteger(prefs.sidebar_width)) {
       state.sidebarWidth = applySidebarWidth(prefs.sidebar_width);
     }
@@ -733,6 +738,16 @@
   }
 
   state.sortFeedsAlphabetically = loadSortFeedsAlpha();
+
+  function loadMarkReadOnNav() {
+    try {
+      return localStorage.getItem(MARK_READ_ON_NAV_KEY) === '1';
+    } catch (e) {
+      return false;
+    }
+  }
+
+  state.markReadOnNav = loadMarkReadOnNav();
 
   function effectiveSortOrder() {
     return state.filter.type === 'unread' ? state.sortOrderUnread : state.sortOrder;
@@ -2641,6 +2656,7 @@
   function openSettings() {
     closeSidebar();
     document.getElementById('settings-sort-feeds-alpha').checked = state.sortFeedsAlphabetically;
+    document.getElementById('settings-mark-read-on-nav').checked = state.markReadOnNav;
     document.getElementById('settings-overlay').hidden = false;
   }
 
@@ -2692,6 +2708,16 @@
     }
     saveUiPref({ sort_feeds_alphabetically: state.sortFeedsAlphabetically });
     renderSidebar();
+  });
+
+  document.getElementById('settings-mark-read-on-nav').addEventListener('change', (e) => {
+    state.markReadOnNav = e.target.checked;
+    try {
+      localStorage.setItem(MARK_READ_ON_NAV_KEY, state.markReadOnNav ? '1' : '0');
+    } catch (err) {
+      // Ignore storage errors (e.g. private browsing quota).
+    }
+    saveUiPref({ mark_read_on_nav: state.markReadOnNav });
   });
 
   function openShortcuts() {
@@ -2985,6 +3011,10 @@
         nextIndex = Math.max(0, Math.min(state.items.length - 1, nextIndex));
       }
       selectItem(state.items[nextIndex].id, nextIndex);
+      if (state.markReadOnNav && (e.key === 'ArrowDown' || e.key === 'j') && nextIndex !== currentIndex) {
+        const rowEl = document.querySelectorAll('#item-list li')[nextIndex];
+        if (rowEl) markItemRead(state.items[nextIndex], rowEl);
+      }
       return;
     }
 
