@@ -59,7 +59,7 @@
     if (!isFormData) {
       headers['Content-Type'] = 'application/json';
     }
-    const res = await fetch(API + path, { ...opts, headers });
+    const res = await fetch(API + path, { ...opts, headers, cache: 'no-store' });
     let data = null;
     let parseFailed = false;
     try {
@@ -1518,7 +1518,7 @@
 
       const meta = document.createElement('div');
       meta.className = 'meta';
-      meta.textContent = (item.feed_title || '') + (item.published ? ' · ' + timeAgo(item.published) : '');
+      meta.textContent = (item.feed_title || '') + (item.published ? ' · ' + formatItemTime(item.published) : '');
 
       content.appendChild(title);
       content.appendChild(meta);
@@ -1872,7 +1872,7 @@
     link.href = item.link || '#';
 
     document.getElementById('reading-pane-meta').textContent =
-      (item.feed_title || '') + (item.published ? ' · ' + timeAgo(item.published) : '');
+      (item.feed_title || '') + (item.published ? ' · ' + formatItemTime(item.published) : '');
 
     renderReadingPaneTags(item);
     renderReadingPaneComment(item);
@@ -2235,6 +2235,20 @@
     if (hours < 24) return hours + 'h ago';
     const days = Math.floor(hours / 24);
     return days + 'd ago';
+  }
+
+  // Exact time for today's items, localized date+time for anything older —
+  // a local calendar-day comparison rather than a rolling 24h window, so an
+  // item from 11pm yesterday still shows its date instead of a bare time.
+  function formatItemTime(iso) {
+    const date = new Date(iso);
+    const now = new Date();
+    const sameDay = date.getFullYear() === now.getFullYear()
+      && date.getMonth() === now.getMonth()
+      && date.getDate() === now.getDate();
+    return sameDay
+      ? date.toLocaleTimeString([], { timeStyle: 'short' })
+      : date.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
   }
 
   async function markItemRead(item, rowEl) {

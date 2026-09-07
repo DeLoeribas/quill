@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../src/bootstrap.php';
+require_once __DIR__ . '/../../src/ArticleSummaryResolver.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 Auth::requireLogin();
@@ -23,6 +24,25 @@ if ($method === 'GET') {
         $itemsData = read_items_file($detailFeedId);
         foreach ($itemsData['items'] as $item) {
             if ($item['id'] === $itemIdParam) {
+                // Feed provided no usable description at all (e.g. Hacker News's RSS) —
+                // fall back to the linked article's og:description/meta description,
+                // caching the result (even '' for "checked, nothing there") so this
+                // only ever fetches once per item.
+                if ($item['summary'] === null && !empty($item['link'])) {
+                    $fetched = ArticleSummaryResolver::resolve($item['link']);
+                    if ($fetched !== null) {
+                        $item['summary'] = $fetched;
+                        Storage::update(items_file_path($detailFeedId), ['feed_id' => $detailFeedId, 'items' => []], function (array $data) use ($itemIdParam, $fetched) {
+                            foreach ($data['items'] as $i => $storedItem) {
+                                if ($storedItem['id'] === $itemIdParam) {
+                                    $data['items'][$i]['summary'] = $fetched;
+                                    break;
+                                }
+                            }
+                            return $data;
+                        });
+                    }
+                }
                 $item['feed_id'] = $detailFeedId;
                 $item['feed_title'] = $feedTitleById[$detailFeedId] ?? null;
                 json_response(['item' => $item]);
