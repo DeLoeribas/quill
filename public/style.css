@@ -248,8 +248,15 @@ button {
 
 #sidebar {
   width: 300px;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   background: var(--sidebar-bg);
+}
+
+#folder-list {
+  flex: 1;
+  overflow-y: auto;
   padding: 8px 0;
 }
 
@@ -325,6 +332,9 @@ body.resizing-sidebar #sidebar {
 #folder-list, #folder-list ul {
   list-style: none;
   margin: 0;
+}
+
+#folder-list ul {
   padding: 0;
 }
 
@@ -590,6 +600,23 @@ body.resizing-sidebar #sidebar {
   .folder-feeds-wrap {
     transition: none;
   }
+}
+
+#sidebar-add-feed {
+  flex-shrink: 0;
+  border-top: 1px solid var(--border);
+}
+
+#add-feed-toggle-btn {
+  width: 100%;
+  border: none;
+  background: none;
+  font: inherit;
+  text-align: left;
+}
+
+#add-feed-toggle-btn .name {
+  font-size: smaller;
 }
 
 #content-pane {
@@ -875,21 +902,21 @@ body.resizing-reading-pane {
   resize: vertical;
 }
 
-#sidebar, #item-pane, #reading-pane {
+#folder-list, #item-pane, #reading-pane {
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
 }
 
-#sidebar::-webkit-scrollbar, #item-pane::-webkit-scrollbar, #reading-pane::-webkit-scrollbar {
+#folder-list::-webkit-scrollbar, #item-pane::-webkit-scrollbar, #reading-pane::-webkit-scrollbar {
   width: 8px;
 }
 
-#sidebar::-webkit-scrollbar-thumb, #item-pane::-webkit-scrollbar-thumb, #reading-pane::-webkit-scrollbar-thumb {
+#folder-list::-webkit-scrollbar-thumb, #item-pane::-webkit-scrollbar-thumb, #reading-pane::-webkit-scrollbar-thumb {
   background: var(--border);
   border-radius: 4px;
 }
 
-#sidebar::-webkit-scrollbar-thumb:hover, #item-pane::-webkit-scrollbar-thumb:hover, #reading-pane::-webkit-scrollbar-thumb:hover {
+#folder-list::-webkit-scrollbar-thumb:hover, #item-pane::-webkit-scrollbar-thumb:hover, #reading-pane::-webkit-scrollbar-thumb:hover {
   background: var(--muted);
 }
 
@@ -1312,7 +1339,7 @@ body.resizing-reading-pane {
   margin-top: 4px;
 }
 
-#settings-overlay, #login-overlay, #shortcuts-overlay {
+#settings-overlay, #login-overlay, #shortcuts-overlay, #add-feed-overlay {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.5);
@@ -1323,11 +1350,11 @@ body.resizing-reading-pane {
   z-index: 100;
 }
 
-#settings-overlay[hidden], #login-overlay[hidden], #shortcuts-overlay[hidden] {
+#settings-overlay[hidden], #login-overlay[hidden], #shortcuts-overlay[hidden], #add-feed-overlay[hidden] {
   display: none;
 }
 
-#settings-modal, #login-modal, #shortcuts-modal {
+#settings-modal, #login-modal, #shortcuts-modal, #add-feed-modal {
   background: var(--bg);
   color: var(--fg);
   border: 1px solid var(--border);
@@ -1446,7 +1473,7 @@ body.resizing-reading-pane {
   gap: 8px;
 }
 
-#login-form {
+#login-form, #add-feed-form {
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -1481,9 +1508,13 @@ body.resizing-reading-pane {
   min-width: 0;
 }
 
+#add-feed-candidates-row {
+  margin-top: 8px;
+}
+
 #add-feed-folder {
-  max-width: 110px;
-  flex-shrink: 0;
+  flex: 1;
+  min-width: 0;
 }
 
 #settings-opml-export-btn {
@@ -1552,8 +1583,9 @@ kbd {
   border-radius: 6px;
   font-size: 13px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
-  /* Above #settings-overlay/#login-overlay/#shortcuts-overlay (z-index: 100) so a
-     toast fired while one of those is open isn't caught behind its dim overlay. */
+  /* Above #settings-overlay/#login-overlay/#shortcuts-overlay/#add-feed-overlay
+     (z-index: 100) so a toast fired while one of those is open isn't caught
+     behind its dim overlay. */
   z-index: 110;
 }
 
@@ -1677,26 +1709,13 @@ kbd {
 }
 
 @media (max-width: 480px) {
-  #settings-overlay, #login-overlay {
+  #settings-overlay, #login-overlay, #add-feed-overlay {
     padding: 24px 12px;
-  }
-
-  #add-feed-form.modal-row {
-    flex-wrap: wrap;
-  }
-
-  #add-feed-form #add-feed-url {
-    flex: 1 1 100%;
-  }
-
-  #add-feed-folder {
-    max-width: none;
-    flex: 1 1 auto;
   }
 }
 
 @media (max-height: 500px) {
-  #settings-overlay, #login-overlay {
+  #settings-overlay, #login-overlay, #add-feed-overlay {
     padding-top: 16px;
   }
 }

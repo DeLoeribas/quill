@@ -32,19 +32,6 @@
     </div>
 
     <section class="modal-section">
-      <label for="add-feed-url">Add feed</label>
-      <form id="add-feed-form" class="modal-row">
-        <input type="text" inputmode="url" id="add-feed-url" placeholder="example.com/feed.xml" required>
-        <select id="add-feed-folder"><option value="">No folder</option></select>
-        <button type="submit">Add</button>
-      </form>
-      <div class="modal-row" id="add-feed-candidates-row" hidden>
-        <select id="add-feed-candidates"></select>
-        <button type="button" id="add-feed-candidates-confirm-btn">Use this feed</button>
-      </div>
-    </section>
-
-    <section class="modal-section">
       <label class="modal-checkbox-row">
         <input type="checkbox" id="settings-sort-feeds-alpha">
         Sort feeds within folders alphabetically
@@ -166,10 +153,41 @@
   </div>
 </div>
 
+<div id="add-feed-overlay" hidden>
+  <div id="add-feed-modal" role="dialog" aria-labelledby="add-feed-title">
+    <div class="modal-header">
+      <h2 id="add-feed-title">Add feed</h2>
+      <button id="add-feed-close-btn" type="button" class="modal-close" aria-label="Close add feed">✕</button>
+    </div>
+    <section class="modal-section">
+      <label for="add-feed-url">Feed URL</label>
+      <form id="add-feed-form">
+        <div class="modal-row">
+          <input type="text" inputmode="url" id="add-feed-url" placeholder="example.com/feed.xml" required>
+        </div>
+        <div class="modal-row">
+          <select id="add-feed-folder"><option value="">No folder</option></select>
+          <button type="submit">Add</button>
+        </div>
+      </form>
+      <div class="modal-row" id="add-feed-candidates-row" hidden>
+        <select id="add-feed-candidates"></select>
+        <button type="button" id="add-feed-candidates-confirm-btn">Use this feed</button>
+      </div>
+    </section>
+  </div>
+</div>
+
 <div id="app-body" hidden>
   <div id="sidebar-backdrop" hidden></div>
   <nav id="sidebar">
     <ul id="folder-list"></ul>
+    <div id="sidebar-add-feed">
+      <button type="button" id="add-feed-toggle-btn" class="sidebar-row">
+        <span class="sidebar-row-icon"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
+        <span class="name">Add feed</span>
+      </button>
+    </div>
   </nav>
   <div id="sidebar-resizer" role="separator" aria-orientation="vertical" aria-label="Resize sidebar"></div>
 

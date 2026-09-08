@@ -2394,6 +2394,7 @@
       }
       hideFeedCandidates();
       document.getElementById('add-feed-url').value = '';
+      closeAddFeed();
       await loadFeeds();
       if (result.feed && result.feed.last_status === 'error') {
         toast('Feed added, but the last refresh failed: ' + (result.feed.last_error || 'unknown error'));
@@ -2422,6 +2423,23 @@
   function hideFeedCandidates() {
     document.getElementById('add-feed-candidates-row').hidden = true;
   }
+
+  function openAddFeed() {
+    closeSidebar();
+    document.getElementById('add-feed-overlay').hidden = false;
+    document.getElementById('add-feed-url').focus();
+  }
+
+  function closeAddFeed() {
+    document.getElementById('add-feed-overlay').hidden = true;
+    hideFeedCandidates();
+  }
+
+  document.getElementById('add-feed-toggle-btn').addEventListener('click', openAddFeed);
+  document.getElementById('add-feed-close-btn').addEventListener('click', closeAddFeed);
+  document.getElementById('add-feed-overlay').addEventListener('click', (e) => {
+    if (e.target.id === 'add-feed-overlay') closeAddFeed();
+  });
 
   document.getElementById('add-feed-form').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -2662,7 +2680,6 @@
 
   function closeSettings() {
     document.getElementById('settings-overlay').hidden = true;
-    hideFeedCandidates();
   }
 
   function openSidebar() {
@@ -2891,6 +2908,8 @@
         closeShortcuts();
       } else if (!document.getElementById('settings-overlay').hidden) {
         closeSettings();
+      } else if (!document.getElementById('add-feed-overlay').hidden) {
+        closeAddFeed();
       } else if (!document.getElementById('refresh-interval-popover').hidden) {
         closeRefreshIntervalPopover();
       } else if (!document.getElementById('feed-row-menu').hidden) {
