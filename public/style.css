@@ -605,18 +605,31 @@ body.resizing-sidebar #sidebar {
 #sidebar-add-feed {
   flex-shrink: 0;
   border-top: 1px solid var(--border);
+  padding: 8px 16px;
 }
 
 #add-feed-toggle-btn {
-  width: 100%;
+  width: auto;
   border: none;
-  background: none;
+  background: var(--badge-bg);
+  color: var(--badge-fg);
   font: inherit;
   text-align: left;
+  padding: 4px 12px;
+  border-radius: 999px;
+}
+
+#add-feed-toggle-btn:hover {
+  background: var(--badge-bg);
+  filter: brightness(0.92);
+}
+
+#add-feed-toggle-btn .sidebar-row-icon {
+  color: var(--badge-fg);
 }
 
 #add-feed-toggle-btn .name {
-  font-size: smaller;
+  font-size: 0.7rem;
 }
 
 #content-pane {
