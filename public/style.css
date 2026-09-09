@@ -4,11 +4,12 @@
   --muted: #6b7280;
   --border: #e5e7eb;
   --accent: #2563eb;
+  --accent-text: #ffffff;
   --unread-dot: #2563eb;
   --hover: #f3f4f6;
   --folder-bg: color-mix(in srgb, var(--fg) 6%, var(--bg));
-  --badge-bg: #2563eb;
-  --badge-fg: #ffffff;
+  --badge-bg: var(--accent);
+  --badge-fg: var(--accent-text);
   --sidebar-bg: #ffffff;
   --shadow-color: rgba(15, 23, 42, 0.06);
   --selected-bg: color-mix(in srgb, var(--accent) 16%, var(--bg));
@@ -204,7 +205,7 @@ select, button, input[type="url"], input[type="search"] {
 button[type="submit"] {
   background: var(--accent);
   border-color: var(--accent);
-  color: #ffffff;
+  color: var(--accent-text);
   font-weight: 600;
 }
 
