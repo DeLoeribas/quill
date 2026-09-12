@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#14161a" media="(prefers-color-scheme: dark)">
 <title>Quill</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
-<link rel="stylesheet" href="style.css?v=19">
+<link rel="stylesheet" href="style.css?v=21">
 </head>
 <body>
 <header id="app-header" hidden>
@@ -174,6 +174,22 @@
       <div class="modal-row" id="add-feed-candidates-row" hidden>
         <select id="add-feed-candidates"></select>
         <button type="button" id="add-feed-candidates-confirm-btn">Use this feed</button>
+      </div>
+    </section>
+  </div>
+</div>
+
+<div id="feed-filters-overlay" hidden>
+  <div id="feed-filters-modal" role="dialog" aria-labelledby="feed-filters-title">
+    <div class="modal-header">
+      <h2 id="feed-filters-title">Edit content filters</h2>
+      <button id="feed-filters-close-btn" type="button" class="modal-close" aria-label="Close content filters">✕</button>
+    </div>
+    <section class="modal-section">
+      <label>Skip items whose title or summary contains any of these:</label>
+      <div id="feed-filters-list"></div>
+      <div id="feed-filters-input-wrap">
+        <input id="feed-filters-input" type="text" placeholder="Add filter term…" autocomplete="off">
       </div>
     </section>
   </div>

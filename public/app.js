@@ -1290,7 +1290,7 @@
     filterItem.addEventListener('click', (e) => {
       e.stopPropagation();
       closeFeedRowMenu();
-      editFeedFilters(feed);
+      openFeedFilters(feed);
     });
     menu.appendChild(filterItem);
 
@@ -1393,22 +1393,97 @@
     }
   }
 
-  async function editFeedFilters(feed) {
-    const current = (feed.filters || []).join(', ');
-    const input = window.prompt(
-      `Skip items in "${feed.title}" whose title or summary contains any of these (comma-separated, leave blank for none):`,
-      current
-    );
-    if (input === null) return;
-    const filters = input.split(',').map((s) => s.trim()).filter(Boolean);
+  let feedFiltersEditingFeed = null;
+
+  function openFeedFilters(feed) {
+    feedFiltersEditingFeed = feed;
+    document.getElementById('feed-filters-title').textContent = `Edit content filters: ${feed.title}`;
+    renderFeedFiltersList();
+    document.getElementById('feed-filters-input').value = '';
+    document.getElementById('feed-filters-overlay').hidden = false;
+    document.getElementById('feed-filters-input').focus();
+  }
+
+  function closeFeedFilters() {
+    document.getElementById('feed-filters-overlay').hidden = true;
+    feedFiltersEditingFeed = null;
+  }
+
+  function renderFeedFiltersList() {
+    const list = document.getElementById('feed-filters-list');
+    list.innerHTML = '';
+    const filters = (feedFiltersEditingFeed && feedFiltersEditingFeed.filters) || [];
+    for (const term of filters) {
+      const chip = document.createElement('span');
+      chip.className = 'tag-chip';
+      const label = document.createElement('span');
+      label.textContent = term;
+      chip.appendChild(label);
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.textContent = '×';
+      removeBtn.setAttribute('aria-label', `Remove filter "${term}"`);
+      removeBtn.addEventListener('click', () => removeFeedFilterTerm(term));
+      chip.appendChild(removeBtn);
+      list.appendChild(chip);
+    }
+  }
+
+  async function addFeedFilterTerm(raw) {
+    const feed = feedFiltersEditingFeed;
+    const term = raw.trim();
+    if (!feed || term === '') return;
+    const current = feed.filters || [];
+    if (current.some((t) => t.toLowerCase() === term.toLowerCase())) {
+      document.getElementById('feed-filters-input').value = '';
+      return;
+    }
+    const updated = [...current, term];
+    feed.filters = updated;
+    renderFeedFiltersList();
+    document.getElementById('feed-filters-input').value = '';
     try {
-      await patch('feeds.php?id=' + encodeURIComponent(feed.id), { filters });
+      await patch('feeds.php?id=' + encodeURIComponent(feed.id), { filters: updated });
       await loadFeeds();
-      toast(filters.length ? `Filtering "${feed.title}" on ${filters.length} term${filters.length === 1 ? '' : 's'}` : `Cleared filters for "${feed.title}"`);
+      feedFiltersEditingFeed = state.feeds.find((f) => f.id === feed.id) || feed;
+      renderFeedFiltersList();
     } catch (err) {
+      feed.filters = current;
+      renderFeedFiltersList();
       toast('Failed to update filters: ' + err.message);
     }
   }
+
+  async function removeFeedFilterTerm(term) {
+    const feed = feedFiltersEditingFeed;
+    if (!feed) return;
+    const current = feed.filters || [];
+    const updated = current.filter((t) => t !== term);
+    feed.filters = updated;
+    renderFeedFiltersList();
+    try {
+      await patch('feeds.php?id=' + encodeURIComponent(feed.id), { filters: updated });
+      await loadFeeds();
+      feedFiltersEditingFeed = state.feeds.find((f) => f.id === feed.id) || feed;
+      renderFeedFiltersList();
+    } catch (err) {
+      feed.filters = current;
+      renderFeedFiltersList();
+      toast('Failed to update filters: ' + err.message);
+    }
+  }
+
+  document.getElementById('feed-filters-close-btn').addEventListener('click', closeFeedFilters);
+  document.getElementById('feed-filters-overlay').addEventListener('click', (e) => {
+    if (e.target.id === 'feed-filters-overlay') closeFeedFilters();
+  });
+  const feedFiltersInput = document.getElementById('feed-filters-input');
+  feedFiltersInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addFeedFilterTerm(feedFiltersInput.value);
+    }
+  });
 
   async function renameFeed(feed) {
     const input = window.prompt('Rename feed:', feed.title);
@@ -2910,6 +2985,8 @@
         closeSettings();
       } else if (!document.getElementById('add-feed-overlay').hidden) {
         closeAddFeed();
+      } else if (!document.getElementById('feed-filters-overlay').hidden) {
+        closeFeedFilters();
       } else if (!document.getElementById('refresh-interval-popover').hidden) {
         closeRefreshIntervalPopover();
       } else if (!document.getElementById('feed-row-menu').hidden) {

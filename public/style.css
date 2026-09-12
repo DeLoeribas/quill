@@ -778,10 +778,14 @@ body.resizing-reading-pane {
   margin: -8px 0 16px;
 }
 
-#reading-pane-tags-list {
+#reading-pane-tags-list, #feed-filters-list {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+#feed-filters-list {
+  margin-bottom: 8px;
 }
 
 .tag-chip {
@@ -815,8 +819,7 @@ body.resizing-reading-pane {
   position: relative;
 }
 
-#reading-pane-tag-input {
-  width: 110px;
+#reading-pane-tag-input, #feed-filters-input {
   font-size: 12px;
   padding: 3px 8px;
   border: 1px dashed var(--border);
@@ -825,8 +828,16 @@ body.resizing-reading-pane {
   color: var(--fg);
 }
 
+#reading-pane-tag-input {
+  width: 110px;
+}
+
 #reading-pane-tag-input:focus {
   width: 160px;
+}
+
+#feed-filters-input {
+  width: 100%;
 }
 
 .tag-suggest-menu {
@@ -1353,7 +1364,7 @@ body.resizing-reading-pane {
   margin-top: 4px;
 }
 
-#settings-overlay, #login-overlay, #shortcuts-overlay, #add-feed-overlay {
+#settings-overlay, #login-overlay, #shortcuts-overlay, #add-feed-overlay, #feed-filters-overlay {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.5);
@@ -1364,11 +1375,15 @@ body.resizing-reading-pane {
   z-index: 100;
 }
 
-#settings-overlay[hidden], #login-overlay[hidden], #shortcuts-overlay[hidden], #add-feed-overlay[hidden] {
+#settings-overlay[hidden], #login-overlay[hidden], #shortcuts-overlay[hidden], #add-feed-overlay[hidden], #feed-filters-overlay[hidden] {
   display: none;
 }
 
-#settings-modal, #login-modal, #shortcuts-modal, #add-feed-modal {
+#feed-filters-overlay {
+  align-items: center;
+}
+
+#settings-modal, #login-modal, #shortcuts-modal, #add-feed-modal, #feed-filters-modal {
   background: var(--bg);
   color: var(--fg);
   border: 1px solid var(--border);
