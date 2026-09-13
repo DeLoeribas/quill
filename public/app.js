@@ -1093,9 +1093,17 @@
 
     const row = document.createElement('div');
     row.className = 'sidebar-row feed-row' + (isActive ? ' active' : '') + (isEnabled ? '' : ' feed-disabled');
-    row.innerHTML = `<span class="name"></span><span class="feed-error-badge" hidden>⚠</span><span class="filter-badge" hidden></span><span class="count"></span>`;
+    row.innerHTML = `<span class="name"></span><span class="feed-error-badge" hidden>⚠</span>`;
     row.querySelector('.name').textContent = feed.title;
-    row.querySelector('.count').textContent = feed.unread_count ? feed.unread_count : '';
+
+    const countEl = document.createElement('span');
+    countEl.className = 'count';
+    if (feed.unread_count) {
+      countEl.textContent = feed.unread_count;
+    } else {
+      countEl.hidden = true;
+    }
+    row.appendChild(countEl);
 
     const faviconSrc = faviconUrlFor(feed);
     if (faviconSrc) {
@@ -1129,7 +1137,9 @@
       faviconElements.delete(feed.id);
     }
 
-    const filterBadge = row.querySelector('.filter-badge');
+    const filterBadge = document.createElement('span');
+    filterBadge.className = 'filter-badge';
+    filterBadge.hidden = true;
     if (filters.length > 0) {
       filterBadge.hidden = false;
       filterBadge.innerHTML = EYE_SLASH_ICON + filters.length;
@@ -1163,9 +1173,13 @@
       openFeedRowMenu(feed, isEnabled, point);
     });
 
-    const buttons = document.createElement('div');
-    buttons.className = 'row-buttons';
-    row.appendChild(buttons);
+    const buttonsLeft = document.createElement('div');
+    buttonsLeft.className = 'row-buttons row-buttons-left';
+    row.appendChild(buttonsLeft);
+    row.appendChild(filterBadge);
+    const buttonsRight = document.createElement('div');
+    buttonsRight.className = 'row-buttons row-buttons-right';
+    row.appendChild(buttonsRight);
 
     const refreshBtn = document.createElement('button');
     refreshBtn.type = 'button';
@@ -1176,7 +1190,7 @@
       e.stopPropagation();
       refreshOneFeed(feed.id, feed.title, refreshBtn);
     });
-    buttons.appendChild(refreshBtn);
+    buttonsLeft.appendChild(refreshBtn);
 
     const removeBtn = document.createElement('button');
     removeBtn.type = 'button';
@@ -1198,7 +1212,7 @@
         removeBtn.textContent = '✕';
       }, 3000);
     });
-    buttons.appendChild(removeBtn);
+    buttonsLeft.appendChild(removeBtn);
 
     const moreBtn = document.createElement('button');
     moreBtn.type = 'button';
@@ -1209,7 +1223,7 @@
       e.stopPropagation();
       toggleFeedRowMenu(feed, isEnabled, moreBtn);
     });
-    buttons.appendChild(moreBtn);
+    buttonsRight.appendChild(moreBtn);
 
     return row;
   }

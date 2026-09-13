@@ -364,6 +364,30 @@ body.resizing-sidebar #sidebar {
   margin-right: -5px;
 }
 
+.sidebar-row.feed-row .row-buttons-left {
+  margin-right: 0;
+}
+
+.sidebar-row.feed-row .filter-badge {
+  order: 10;
+}
+
+.sidebar-row.feed-row .count {
+  order: 20;
+}
+
+.sidebar-row.feed-row .row-buttons-left {
+  order: 30;
+}
+
+.sidebar-row.feed-row .row-buttons-right {
+  order: 40;
+}
+
+.sidebar-row.feed-row:hover .filter-badge {
+  order: 35;
+}
+
 .sidebar-row:hover {
   background: var(--hover);
 }
