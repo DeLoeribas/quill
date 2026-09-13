@@ -25,11 +25,11 @@ mkdir -p "$out"
 # ':!site' the marketing landing page — none of it is needed on the app server.
 git archive HEAD -- . ':!bin' ':!README.md' ':!site' | tar -x -C "$out"
 
-# Stamp the nearest reachable tag into the package, since each deploy is an
-# independent snapshot on its own host, not a live git checkout. --abbrev=0 drops the
-# commit-count/hash suffix, so this reads e.g. "1.0.4" even a few commits past that tag.
-# Falls back to "dev" (same signal as an unpackaged local run) until you tag a release.
-version="$(git describe --tags --abbrev=0 HEAD 2>/dev/null || echo dev)"
+# Stamp the commit being packaged into it, since each deploy is an independent snapshot
+# on its own host, not a live git checkout. Using the commit hash (rather than a tag)
+# means the update-available check works even when releases aren't tagged — every deploy
+# gets a distinct, comparable version.
+version="$(git rev-parse --short HEAD)"
 cat > "$out/src/version.php" <<PHP
 <?php
 define('APP_VERSION', '$version');

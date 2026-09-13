@@ -7,9 +7,10 @@ final class GithubVersionChecker
     private const MAX_RESPONSE_BYTES = 65536;
 
     /**
-     * Returns the latest GitHub tag if $currentVersion is behind it, or null if it's
-     * current, unknown, or GitHub couldn't be reached. $currentVersion is APP_VERSION —
-     * either a plain tag (e.g. "1.2.0") or "dev" (no tags yet, or a local unpackaged run).
+     * Returns the latest commit's short SHA if $currentVersion is behind it, or null if
+     * it's current, unknown, or GitHub couldn't be reached. $currentVersion is
+     * APP_VERSION — either a short commit hash (e.g. "a1b2c3d") stamped at package time,
+     * or "dev" (a local unpackaged run).
      */
     public static function updateAvailable(string $currentVersion): ?string
     {
@@ -17,39 +18,43 @@ final class GithubVersionChecker
             return null;
         }
 
-        $latest = self::latestTag();
+        $latest = self::latestCommitSha();
         if ($latest === null) {
             return null;
         }
 
-        return version_compare($currentVersion, $latest, '<') ? $latest : null;
+        if (str_starts_with($latest, $currentVersion)) {
+            return null;
+        }
+
+        return substr($latest, 0, 7);
     }
 
-    private static function latestTag(): ?string
+    private static function latestCommitSha(): ?string
     {
-        $cache = Storage::read(GITHUB_VERSION_CACHE_FILE, ['tag' => null, 'checked_at' => null]);
+        $cache = Storage::read(GITHUB_VERSION_CACHE_FILE, ['sha' => null, 'checked_at' => null]);
         $checkedAt = $cache['checked_at'] ?? null;
         $stale = $checkedAt === null || (time() - strtotime((string) $checkedAt)) >= GITHUB_VERSION_CACHE_SECONDS;
 
         if (!$stale) {
-            return $cache['tag'];
+            return $cache['sha'];
         }
 
-        $fetched = self::fetchLatestTag();
-        // Keep the last-known-good tag if GitHub is unreachable right now, but still
+        $fetched = self::fetchLatestCommitSha();
+        // Keep the last-known-good sha if GitHub is unreachable right now, but still
         // bump checked_at so we don't retry on every single request while it's down.
-        $tag = $fetched ?? ($cache['tag'] ?? null);
+        $sha = $fetched ?? ($cache['sha'] ?? null);
 
-        Storage::update(GITHUB_VERSION_CACHE_FILE, ['tag' => null, 'checked_at' => null], function () use ($tag) {
-            return ['tag' => $tag, 'checked_at' => date(DATE_ATOM)];
+        Storage::update(GITHUB_VERSION_CACHE_FILE, ['sha' => null, 'checked_at' => null], function () use ($sha) {
+            return ['sha' => $sha, 'checked_at' => date(DATE_ATOM)];
         });
 
-        return $tag;
+        return $sha;
     }
 
-    private static function fetchLatestTag(): ?string
+    private static function fetchLatestCommitSha(): ?string
     {
-        $ch = curl_init('https://api.github.com/repos/' . GITHUB_REPO . '/tags?per_page=30');
+        $ch = curl_init('https://api.github.com/repos/' . GITHUB_REPO . '/commits/main');
         $buffer = '';
 
         curl_setopt_array($ch, [
@@ -75,24 +80,9 @@ final class GithubVersionChecker
             return null;
         }
 
-        $tags = json_decode($buffer, true);
-        if (!is_array($tags)) {
-            return null;
-        }
+        $commit = json_decode($buffer, true);
+        $sha = $commit['sha'] ?? null;
 
-        // GitHub's tag order isn't a documented semver guarantee, so pick the max
-        // ourselves rather than trusting response order.
-        $best = null;
-        foreach ($tags as $tag) {
-            $name = $tag['name'] ?? null;
-            if (!is_string($name) || !preg_match('/^\d+(\.\d+){0,2}$/', $name)) {
-                continue;
-            }
-            if ($best === null || version_compare($name, $best, '>')) {
-                $best = $name;
-            }
-        }
-
-        return $best;
+        return is_string($sha) && preg_match('/^[0-9a-f]{40}$/', $sha) ? $sha : null;
     }
 }

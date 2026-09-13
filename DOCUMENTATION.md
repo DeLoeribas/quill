@@ -187,30 +187,21 @@ Cron output counts these separately as `deferred=`, so absorbed failures never i
 
 ## Versioning
 
-The app's footer shows a version, e.g. `v1.0.0` or `vdev`. There's no hand-maintained version constant — each run of `bin/package-for-deploy.sh` stamps `src/version.php` with `git describe --tags --abbrev=0` for whatever commit it's archiving at that moment, so it's always accurate to what's actually deployed even though every install is packaged and uploaded independently. Running the app locally (unpackaged) also shows `vdev`, since `src/version.php` only ever exists inside a packaged copy.
+The app's footer shows a version, e.g. `a1b2c3d` or `dev`. There's no hand-maintained version constant — each run of `bin/package-for-deploy.sh` stamps `src/version.php` with the short commit hash (`git rev-parse --short HEAD`) of whatever commit it's archiving at that moment, so it's always accurate to what's actually deployed even though every install is packaged and uploaded independently. Running the app locally (unpackaged) shows `dev`, since `src/version.php` only ever exists inside a packaged copy. Using the commit hash rather than a tag means the "update available" check below works on every deploy, whether or not you bother tagging releases.
 
-With no tags yet, `git describe` has nothing to abbreviate and falls back to `dev`. To get real version numbers instead, tag a release (without a `v` prefix — the footer already adds one):
-
-```
-git tag -a 1.0.0 -m "1.0.0"
-git push origin 1.0.0
-```
-
-The next `bin/package-for-deploy.sh` run on that commit will then stamp `1.0.0` — and it keeps reading `1.0.0` for any later commit until the next tag, since `--abbrev=0` only ever gives the nearest reachable tag name, never a commit-count/hash suffix.
-
-The footer also checks GitHub for a newer tagged release than the one deployed (cached server-side for up to `GITHUB_VERSION_CACHE_SECONDS`, 6 hours by default). When the deployed version is behind, an "Update available: vX.Y.Z" badge appears linking to the repo's tags page — it stays hidden otherwise (including on an untagged/`dev` build, since there's nothing meaningful to compare).
+The footer also checks GitHub for a newer commit on `main` than the one deployed (cached server-side for up to `GITHUB_VERSION_CACHE_SECONDS`, 6 hours by default). When the deployed commit is behind, an "Update available (…)" badge appears linking to the repo's commit history — it stays hidden otherwise (including on a `dev` build, since there's nothing meaningful to compare).
 
 ## Updating
 
-The badge only tells you a newer tag exists — it doesn't fetch or install anything for you. To actually update a deployed install:
+The badge only tells you a newer commit exists — it doesn't fetch or install anything for you. To actually update a deployed install:
 
-1. **Get the new code.** If you deployed from a git clone, `git pull` (or `git fetch --tags` then check out the tag you want). If you only ever downloaded a zip, grab the new tag's zip from the repo's tags page instead.
-2. **Repackage it.** From a git clone, run `bin/package-for-deploy.sh` again to build a fresh `./deploy/` stamped with the new version. (This step needs an actual git checkout — it shells out to `git archive`/`git describe`, so it won't run against a bare downloaded zip.)
+1. **Get the new code.** If you deployed from a git clone, `git pull`. If you only ever downloaded a zip, grab a fresh zip of `main` from the repo instead.
+2. **Repackage it.** From a git clone, run `bin/package-for-deploy.sh` again to build a fresh `./deploy/` stamped with the new commit hash. (This step needs an actual git checkout — it shells out to `git archive`/`git rev-parse`, so it won't run against a bare downloaded zip.)
 3. **Upload only the app code — not your data.** Overwrite the server's `public/` and `src/*.php` files with the new ones. **Do not** upload the freshly generated `deploy/src/config.php` — it's rebuilt from `config.sample.php` every run and will wipe your real login credentials and `CRON_TOKEN` if you overwrite the live one with it. Leave `data/` alone entirely; nothing in this process touches your feeds, read state, or saved items.
-4. **No git available on the server or locally?** Manually copy the changed files from the new zip over the old ones (same exclusions as above), then hand-edit `src/version.php` to the new tag, e.g.:
+4. **No git available on the server or locally?** Manually copy the changed files from the new zip over the old ones (same exclusions as above), then hand-edit `src/version.php` to a hash identifying the new code, e.g.:
    ```php
    <?php
-   define('APP_VERSION', '1.1.0');
+   define('APP_VERSION', 'a1b2c3d');
    ```
    Skipping this leaves the footer showing the old version, and the "Update available" badge will keep nagging even after you've actually updated.
 

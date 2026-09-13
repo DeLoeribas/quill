@@ -563,7 +563,7 @@
     const el = document.getElementById('app-footer-text');
     const parts = [];
     if (state.appVersion) {
-      parts.push('v' + state.appVersion);
+      parts.push(state.appVersion);
     }
     if (state.lastBuildDate) {
       parts.push('Build: ' + new Date(state.lastBuildDate).toLocaleDateString());
@@ -580,7 +580,7 @@
 
     const badge = document.getElementById('app-footer-update-badge');
     if (state.latestVersion) {
-      badge.textContent = `Update available: v${state.latestVersion}`;
+      badge.textContent = `Update available (${state.latestVersion})`;
       badge.hidden = false;
     } else {
       badge.hidden = true;
