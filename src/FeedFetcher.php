@@ -16,7 +16,7 @@ final class FeedFetchResult
 
 final class ParsedFeed
 {
-    /** @param array<int, array{guid:?string, link:?string, title:?string, published:?string, summary:?string, image:?string}> $items */
+    /** @param array<int, array{guid:?string, link:?string, title:?string, published:?string, summary:?string, image:?string, creator:?string}> $items */
     public function __construct(
         public readonly ?string $feedTitle,
         public readonly ?string $siteUrl,
@@ -306,6 +306,7 @@ final class FeedFetcher
             $title = isset($entry['title']) ? trim((string) $entry['title']) : null;
             $published = self::normalizeDate($entry['date_published'] ?? $entry['date_modified'] ?? null);
             $summary = $entry['content_html'] ?? $entry['content_text'] ?? null;
+            $creator = self::jsonFeedAuthor($entry) ?? self::jsonFeedAuthor($data);
 
             $items[] = [
                 'guid' => $id ?: null,
@@ -314,10 +315,22 @@ final class FeedFetcher
                 'published' => $published,
                 'summary' => $summary !== null ? (string) $summary : null,
                 'image' => self::jsonFeedImage($entry, $summary !== null ? (string) $summary : null),
+                'creator' => $creator,
             ];
         }
 
         return new ParsedFeed($feedTitle ?: null, $siteUrl ?: null, $feedImage ?: null, $items);
+    }
+
+    /** JSON Feed's author field: a single {name,...} object (v1) or an "authors" array (v1.1) — either may appear on an item or, as a fallback, the feed itself. */
+    private static function jsonFeedAuthor(array $source): ?string
+    {
+        $author = $source['author'] ?? ($source['authors'][0] ?? null);
+        if (!is_array($author) || empty($author['name']) || !is_string($author['name'])) {
+            return null;
+        }
+        $name = trim($author['name']);
+        return $name !== '' ? $name : null;
     }
 
     private static function jsonFeedImage(array $entry, ?string $htmlBody): ?string
@@ -348,6 +361,7 @@ final class FeedFetcher
         $xpath->registerNamespace('content', 'http://purl.org/rss/1.0/modules/content/');
         $xpath->registerNamespace('media', 'http://search.yahoo.com/mrss/');
         $xpath->registerNamespace('sy', 'http://purl.org/rss/1.0/modules/syndication/');
+        $xpath->registerNamespace('dc', 'http://purl.org/dc/elements/1.1/');
         // extractImage() queries an "a:" (Atom) link as a fallback regardless of feed
         // format; registering it here too (even though RSS2 docs never use it) keeps
         // that query valid instead of failing with an undefined-prefix error.
@@ -367,6 +381,7 @@ final class FeedFetcher
             $pubDate = self::text($xpath, 'pubDate', $itemNode);
             $encoded = self::text($xpath, 'content:encoded', $itemNode);
             $description = self::text($xpath, 'description', $itemNode);
+            $creator = self::text($xpath, 'dc:creator', $itemNode);
 
             $summary = $encoded && strlen($encoded) > strlen((string) $description) ? $encoded : $description;
             $image = self::extractImage($xpath, $itemNode, $summary);
@@ -378,6 +393,7 @@ final class FeedFetcher
                 'published' => self::normalizeDate($pubDate),
                 'summary' => $summary ?: null,
                 'image' => $image,
+                'creator' => $creator ?: null,
             ];
         }
 
@@ -423,6 +439,7 @@ final class FeedFetcher
         $xpath = new DOMXPath($doc);
         $xpath->registerNamespace('a', 'http://www.w3.org/2005/Atom');
         $xpath->registerNamespace('media', 'http://search.yahoo.com/mrss/');
+        $xpath->registerNamespace('dc', 'http://purl.org/dc/elements/1.1/');
 
         $feedTitle = self::text($xpath, 'a:title', $doc->documentElement);
         $siteUrl = self::atomLink($xpath, $doc->documentElement);
@@ -438,6 +455,7 @@ final class FeedFetcher
             $summary = self::text($xpath, 'a:summary', $entryNode);
             $body = $content ?: $summary ?: self::plainTextWithLineBreaks(self::text($xpath, './/media:description', $entryNode));
             $image = self::extractImage($xpath, $entryNode, $body);
+            $creator = self::text($xpath, 'dc:creator', $entryNode) ?: self::text($xpath, 'a:author/a:name', $entryNode);
 
             $items[] = [
                 'guid' => $id ?: null,
@@ -446,6 +464,7 @@ final class FeedFetcher
                 'published' => self::normalizeDate($published),
                 'summary' => $body ?: null,
                 'image' => $image,
+                'creator' => $creator ?: null,
             ];
         }
 

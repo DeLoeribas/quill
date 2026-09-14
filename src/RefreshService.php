@@ -269,7 +269,7 @@ final class RefreshService
     }
 
     /**
-     * @param array<int, array{guid:?string,link:?string,title:?string,published:?string,summary:?string,image:?string}> $parsedItems
+     * @param array<int, array{guid:?string,link:?string,title:?string,published:?string,summary:?string,image:?string,creator:?string}> $parsedItems
      * @param string[] $filters
      */
     private static function mergeItems(string $feedId, array $parsedItems, array $filters = []): int
@@ -303,6 +303,12 @@ final class RefreshService
                     if (!empty($parsed['summary']) && $parsed['summary'] !== $byId[$id]['summary']) {
                         $byId[$id]['summary'] = $parsed['summary'];
                     }
+                    // Same reasoning as summary above: sync on every refresh rather
+                    // than backfill-once, so a feed that starts/changes attribution
+                    // reaches already-stored items too.
+                    if (!empty($parsed['creator']) && $parsed['creator'] !== ($byId[$id]['creator'] ?? null)) {
+                        $byId[$id]['creator'] = $parsed['creator'];
+                    }
                     continue;
                 }
                 if (self::matchesAnyFilter($parsed['title'] ?? '', $parsed['summary'] ?? '', $filters)) {
@@ -321,6 +327,7 @@ final class RefreshService
                     'published' => $parsed['published'],
                     'summary' => $parsed['summary'],
                     'image' => $parsed['image'] ?? null,
+                    'creator' => $parsed['creator'] ?? null,
                     'read' => $wasEvicted,
                     'fetched_at' => now_iso8601(),
                 ];

@@ -1976,7 +1976,9 @@
     link.href = item.link || '#';
 
     document.getElementById('reading-pane-meta').textContent =
-      (item.feed_title || '') + (item.published ? ' · ' + formatItemTime(item.published) : '');
+      (item.feed_title || '') +
+      (item.creator ? ' · ' + item.creator : '') +
+      (item.published ? ' · ' + formatItemTime(item.published) : '');
 
     renderReadingPaneTags(item);
     renderReadingPaneComment(item);
