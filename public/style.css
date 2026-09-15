@@ -10,6 +10,9 @@
   --folder-bg: color-mix(in srgb, var(--fg) 6%, var(--bg));
   --badge-bg: var(--accent);
   --badge-fg: var(--accent-text);
+  --update-badge-bg: #f59e0b;
+  --update-badge-fg: #1a1200;
+  --update-badge-glow: rgba(245, 158, 11, 0.55);
   --sidebar-bg: #ffffff;
   --shadow-color: rgba(15, 23, 42, 0.06);
   --selected-bg: color-mix(in srgb, var(--accent) 16%, var(--bg));
@@ -30,6 +33,9 @@
     --folder-bg: color-mix(in srgb, var(--fg) 6%, var(--bg));
     --sidebar-bg: #1a1c21;
     --shadow-color: rgba(0, 0, 0, 0.4);
+    --update-badge-bg: #fbbf24;
+    --update-badge-fg: #1a1200;
+    --update-badge-glow: rgba(251, 191, 36, 0.45);
   }
 
   #sidebar:not(.pane-focused) {
@@ -100,13 +106,28 @@ body {
 .update-badge {
   flex-shrink: 0;
   margin-left: 8px;
-  background: var(--badge-bg);
-  color: var(--badge-fg);
+  background: var(--update-badge-bg);
+  color: var(--update-badge-fg);
   border-radius: 999px;
-  padding: 1px 8px;
-  font-size: 11px;
-  font-weight: 600;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
   text-decoration: none;
+  animation: update-badge-pulse 2.4s ease-in-out infinite;
+}
+
+.update-badge:hover {
+  filter: brightness(1.08);
+}
+
+@keyframes update-badge-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 var(--update-badge-glow);
+  }
+  50% {
+    box-shadow: 0 0 0 4px var(--update-badge-glow);
+  }
 }
 
 #app-header h1 {

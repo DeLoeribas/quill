@@ -45,7 +45,14 @@ The manual "Refresh all" button always force-refreshes regardless of interval.
 
 ## Updating
 
-Pull/download the new version, re-run `bin/package-for-deploy.sh`, and upload it over the old install. On your server you can replace `public/`, `cron/`, `bin/`, and all of `src/` **except** `src/config.php` — that one file holds your login credentials and `CRON_TOKEN`, and overwriting it with the freshly generated one wipes them. Leave `data/` alone entirely. The footer shows the deployed version and flags when a newer commit exists on GitHub.
+> [!WARNING]
+> Pull/download the new version, re-run `bin/package-for-deploy.sh`, and upload it over the old install.
+>
+> On your server you can replace `public/`, `cron/`, `bin/`, and all of `src/` **except `src/config.php`** — that one file holds your login credentials and `CRON_TOKEN`, and **overwriting it with the freshly generated one wipes them**.
+>
+> **Leave `data/` alone entirely.**
+>
+> The footer shows the deployed version and flags when a newer commit exists on GitHub.
 
 ## Project layout
 
