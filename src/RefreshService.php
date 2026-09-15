@@ -309,6 +309,16 @@ final class RefreshService
                     if (!empty($parsed['creator']) && $parsed['creator'] !== ($byId[$id]['creator'] ?? null)) {
                         $byId[$id]['creator'] = $parsed['creator'];
                     }
+                    // Same reasoning again: some feeds (e.g. liveblogs) reuse one guid
+                    // across many updates, retitling and re-dating it each time —
+                    // without this, the stored item freezes on whatever title/date it
+                    // had when first fetched, which can be wrong or stale indefinitely.
+                    if (!empty($parsed['title']) && $parsed['title'] !== $byId[$id]['title']) {
+                        $byId[$id]['title'] = $parsed['title'];
+                    }
+                    if (!empty($parsed['published']) && $parsed['published'] !== $byId[$id]['published']) {
+                        $byId[$id]['published'] = $parsed['published'];
+                    }
                     continue;
                 }
                 if (self::matchesAnyFilter($parsed['title'] ?? '', $parsed['summary'] ?? '', $filters)) {
