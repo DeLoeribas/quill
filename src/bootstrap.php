@@ -10,15 +10,41 @@ require_once __DIR__ . '/Storage.php';
 require_once __DIR__ . '/Auth.php';
 require_once __DIR__ . '/RateLimiter.php';
 
+// Defined here rather than with the other config fallbacks further down
+// because the session block below needs it before any of those run.
+if (!defined('SESSION_LIFETIME_SECONDS')) {
+    define('SESSION_LIFETIME_SECONDS', 30 * 24 * 3600);
+}
+
 if (PHP_SAPI !== 'cli') {
-    session_set_cookie_params([
-        'lifetime' => 0,
+    // Sessions live in the app's own data/ folder (web-denied by data/.htaccess)
+    // with a lifetime we control — the host's shared default path is subject to
+    // PHP's 24-minute gc_maxlifetime and to other sites' / the OS's cleanup jobs,
+    // which logged the user out after a short idle.
+    $sessionDir = DATA_DIR . '/sessions';
+    if (!is_dir($sessionDir)) {
+        mkdir($sessionDir, 0775, true);
+    }
+    session_save_path($sessionDir);
+    ini_set('session.gc_maxlifetime', (string) SESSION_LIFETIME_SECONDS);
+    ini_set('session.gc_probability', '1');
+    ini_set('session.gc_divisor', '100');
+
+    $cookieParams = [
         'path' => '/',
         'httponly' => true,
         'samesite' => 'Lax',
         'secure' => (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'),
-    ]);
+    ];
+    session_set_cookie_params(['lifetime' => SESSION_LIFETIME_SECONDS] + $cookieParams);
     session_start();
+
+    // PHP only sends the cookie when the session id is created, so without this
+    // the login would expire a fixed 30 days after logging in; re-sending it
+    // makes the expiry slide forward on every visit.
+    if (!empty($_SESSION['authenticated'])) {
+        setcookie(session_name(), session_id(), ['expires' => time() + SESSION_LIFETIME_SECONDS] + $cookieParams);
+    }
 }
 
 function json_response($data, int $status = 200): never

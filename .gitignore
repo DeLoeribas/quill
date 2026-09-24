@@ -1,6 +1,7 @@
 /data/feeds.json
 /data/auth.json
 /data/login_attempts.json
+/data/sessions/
 /data/items/*.json
 /data/cron.log
 /data/cron-stderr.log

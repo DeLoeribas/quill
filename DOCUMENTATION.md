@@ -40,7 +40,7 @@ php -S localhost:8000 -t public
 
 Open http://localhost:8000/ in a browser.
 
-Data is stored under `data/` as JSON files — nothing else to configure for local use. The first time you open the app you'll be asked to create a username and password (stored as a bcrypt hash in `data/auth.json`); every page and API request requires being logged in via that session afterwards.
+Data is stored under `data/` as JSON files — nothing else to configure for local use. The first time you open the app you'll be asked to create a username and password (stored as a bcrypt hash in `data/auth.json`); every page and API request requires being logged in via that session afterwards. A login stays valid for 30 days since your last visit (each visit restarts the countdown; change it with `SESSION_LIFETIME_SECONDS` in `src/config.php`), even across browser restarts. Session files are kept in `data/sessions/`, which is created automatically as long as `data/` is writable.
 
 **Lost your username or password?** There's no in-app recovery flow (no email involved anywhere in this app). Delete `data/auth.json` directly on the server (SSH, FTP, or your host's file manager) and reload the app — `data/auth.json` missing means no login is configured yet, so you'll get the first-run "Create your login" screen again and can set a new username/password from scratch. Your feeds and articles are untouched — those live in `data/feeds.json`/`data/items/`, not in `auth.json`.
 

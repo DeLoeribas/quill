@@ -59,6 +59,10 @@ define('AUTH_FILE', DATA_DIR . '/auth.json');
 // lockout. Runtime state, not committed.
 define('LOGIN_ATTEMPTS_FILE', DATA_DIR . '/login_attempts.json');
 
+// How long a login stays valid without visiting the app (seconds). Every
+// visit restarts the countdown. Session files are kept in data/sessions/.
+define('SESSION_LIFETIME_SECONDS', 30 * 24 * 3600);
+
 // Secret shared with public/cron.php, the HTTP alternative to
 // cron/refresh.php for hosts with no shell/SSH cron access — an external
 // pinger (your host's "URL cron" feature, cron-job.org, a scheduled GitHub

@@ -56,4 +56,4 @@ echo "     again to build the cron URL, and it can't be recovered from the serve
 echo "Leave it blank (as shipped) to keep the endpoint disabled."
 echo
 echo "Also still needed before it works on the server:"
-echo "  - make sure data/ and data/items/ are writable by the web server"
+echo "  - make sure data/ and data/items/ are writable (data/sessions/ is created automatically) by the web server"
