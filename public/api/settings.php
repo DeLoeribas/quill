@@ -10,9 +10,10 @@ Auth::requireLogin();
 
 if ($method === 'GET') {
     $data = Storage::read(FEEDS_FILE, ['folders' => [], 'feeds' => []]);
+    $version = GithubVersionChecker::status();
     json_response([
-        'app_version' => APP_VERSION,
-        'latest_version' => GithubVersionChecker::updateAvailable(APP_VERSION),
+        'app_version' => $version['version'],
+        'latest_version' => $version['latest'],
         'last_build_date' => last_build_date(),
         'server_name' => server_name(),
         'php_version' => phpversion(),

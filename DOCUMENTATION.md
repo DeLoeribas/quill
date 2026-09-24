@@ -189,7 +189,7 @@ Cron output counts these separately as `deferred=`, so absorbed failures never i
 
 The app's footer shows a version, e.g. `a1b2c3d` or `dev`. There's no hand-maintained version constant — each run of `bin/package-for-deploy.sh` stamps `src/version.php` with the short commit hash (`git rev-parse --short HEAD`) of whatever commit it's archiving at that moment, so it's always accurate to what's actually deployed even though every install is packaged and uploaded independently. Running the app locally (unpackaged) shows `dev`, since `src/version.php` only ever exists inside a packaged copy. Using the commit hash rather than a tag means the "update available" check below works on every deploy, whether or not you bother tagging releases.
 
-The footer also checks GitHub for a newer commit on `main` than the one deployed (cached server-side for up to `GITHUB_VERSION_CACHE_SECONDS`, 6 hours by default). When the deployed commit is behind, an "Update available (…)" badge appears linking to the repo's commit history — it stays hidden otherwise (including on a `dev` build, since there's nothing meaningful to compare).
+The footer also checks GitHub for a newer commit on `main` (cached server-side for up to `GITHUB_VERSION_CACHE_SECONDS`, 6 hours by default). It compares the deployed files in `public/`, `src/` and `cron/` themselves (by git blob hash, ignoring `.htaccess` files and anything not in the repo like `config.php`) against that commit — not `src/version.php` — so copying changed files over by hand is enough for it to notice you're up to date. When everything matches, the footer shows that commit's hash as the version; when any file differs or is missing, an "Update available (…)" badge appears linking to the repo. The check is skipped when running from a git working copy (local development), since uncommitted edits would always trigger it.
 
 ## Updating
 
@@ -198,12 +198,7 @@ The badge only tells you a newer commit exists — it doesn't fetch or install a
 1. **Get the new code.** If you deployed from a git clone, `git pull`. If you only ever downloaded a zip, grab a fresh zip of `main` from the repo instead.
 2. **Repackage it.** From a git clone, run `bin/package-for-deploy.sh` again to build a fresh `./deploy/` stamped with the new commit hash. (This step needs an actual git checkout — it shells out to `git archive`/`git rev-parse`, so it won't run against a bare downloaded zip.)
 3. **Upload only the app code — not your data.** Overwrite the server's `public/` and `src/*.php` files with the new ones. **Do not** upload the freshly generated `deploy/src/config.php` — it's rebuilt from `config.sample.php` every run and will wipe your real login credentials and `CRON_TOKEN` if you overwrite the live one with it. Leave `data/` alone entirely; nothing in this process touches your feeds, read state, or saved items.
-4. **No git available on the server or locally?** Manually copy the changed files from the new zip over the old ones (same exclusions as above), then hand-edit `src/version.php` to a hash identifying the new code, e.g.:
-   ```php
-   <?php
-   define('APP_VERSION', 'a1b2c3d');
-   ```
-   Skipping this leaves the footer showing the old version, and the "Update available" badge will keep nagging even after you've actually updated.
+4. **No git available on the server or locally?** Manually copy the changed files from the new zip over the old ones (same exclusions as above). No version file needs editing — the badge compares the files themselves. After uploading, it can take up to `GITHUB_VERSION_CACHE_SECONDS` (6 hours) for a new commit to be noticed; delete `data/github_version.json` on the server to force a re-check.
 
 ## Project layout
 

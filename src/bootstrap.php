@@ -237,6 +237,9 @@ function server_name(): string
 // time, from the exact commit being archived — deployments are independent snapshots
 // per host, not live git checkouts, so this can't be a hand-maintained constant.
 // version.php doesn't exist in the repo (gitignored); local dev falls back to 'dev'.
+// It's only a fallback label now: the footer shows the matching GitHub commit instead
+// whenever the deployed files match it (see GithubVersionChecker), and the update
+// check never reads it.
 if (file_exists(__DIR__ . '/version.php')) {
     require_once __DIR__ . '/version.php';
 } else {

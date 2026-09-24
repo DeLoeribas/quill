@@ -32,8 +32,8 @@ define('FETCH_RETRY_ATTEMPTS', 3);
 // retries above.
 define('FETCH_TRANSIENT_TOLERANCE', 3);
 
-// Repo the footer checks for a newer tagged release than APP_VERSION, and how often
-// (seconds) to re-check — result is cached in GITHUB_VERSION_CACHE_FILE between checks.
+// Repo the footer compares the deployed code files against (latest commit on main),
+// and how often (seconds) to re-check — cached in GITHUB_VERSION_CACHE_FILE between checks.
 define('GITHUB_REPO', 'DeLoeribas/quill');
 define('GITHUB_VERSION_CACHE_FILE', DATA_DIR . '/github_version.json');
 define('GITHUB_VERSION_CACHE_SECONDS', 6 * 3600);
