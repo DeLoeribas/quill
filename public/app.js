@@ -603,7 +603,12 @@
     el.textContent = parts.join(' · ');
 
     const badge = document.getElementById('app-footer-update-badge');
-    if (state.latestVersion) {
+    const latest = state.latestVersion;
+    const current = state.appVersion;
+    // Belt and braces with the server check: never offer an "update" to the build already running
+    // (short shas can differ in length, so compare by prefix).
+    const isCurrentBuild = latest && current && (latest.startsWith(current) || current.startsWith(latest));
+    if (latest && !isCurrentBuild) {
       badge.textContent = `Update available (${state.latestVersion})`;
       badge.hidden = false;
     } else {

@@ -39,11 +39,21 @@ final class GithubVersionChecker
         }
 
         $shortSha = substr($latest['sha'], 0, 7);
-        if (self::localFilesMatch($root, $latest['files'])) {
+        // If the build is already stamped with the latest commit, never offer it as an update —
+        // a file differing (e.g. an edited public/ file) doesn't make "update to what you have" useful.
+        // Prefix match both ways: `git rev-parse --short` can yield more than 7 chars.
+        if (self::isSameCommit(APP_VERSION, $latest['sha'])
+            || self::localFilesMatch($root, $latest['files'])) {
             return ['version' => $shortSha, 'latest' => null];
         }
 
         return ['version' => APP_VERSION, 'latest' => $shortSha];
+    }
+
+    /** True if $version is an abbreviation (≥7 hex chars) of the full commit $sha. */
+    private static function isSameCommit(string $version, string $sha): bool
+    {
+        return preg_match('/^[0-9a-f]{7,40}$/', $version) === 1 && str_starts_with($sha, $version);
     }
 
     /** True if every compared file in the commit exists locally with identical contents. Extra local files (config.php, version.php) are ignored. */
