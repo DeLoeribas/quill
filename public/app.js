@@ -128,7 +128,31 @@
     if (!html) return wrapper;
     const parsed = new DOMParser().parseFromString(html, 'text/html');
     sanitizeInto(parsed.body, wrapper);
+    unwrapImageLayoutTables(wrapper);
     return wrapper;
+  }
+
+  // Some feeds (notably Reddit) lay out each post as a one-row, two-cell table: a
+  // thumbnail in the left cell, the body in the right. Flatten that into the image
+  // on top followed by the text, rather than rendering it as a bordered grid.
+  // Real data tables (more rows/cells, or text in the first cell) are left alone.
+  function unwrapImageLayoutTables(root) {
+    for (const table of Array.from(root.querySelectorAll('table'))) {
+      const rows = table.querySelectorAll('tr');
+      if (rows.length !== 1) continue;
+      const cells = Array.from(rows[0].children).filter((c) => c.tagName === 'TD' || c.tagName === 'TH');
+      if (cells.length !== 2) continue;
+      const [imageCell, bodyCell] = cells;
+      if (imageCell.textContent.trim() !== '' || !imageCell.querySelector('img')) continue;
+
+      const frag = document.createDocumentFragment();
+      const lead = document.createElement('div');
+      lead.className = 'summary-lead-image';
+      lead.append(...imageCell.childNodes);
+      frag.appendChild(lead);
+      frag.append(...bodyCell.childNodes);
+      table.replaceWith(frag);
+    }
   }
 
   function sanitizeInto(sourceParent, destParent) {
@@ -2001,9 +2025,13 @@
     }
 
     // Skip the header image when the summary body already has one — avoids
-    // showing the same picture twice at the top of the reading pane.
+    // showing the same picture twice at the top of the reading pane. Also skip it
+    // while the summary is still loading: we can't tell yet whether the body has
+    // its own image, and showing the large header only to swap it out a moment
+    // later causes a visible flash. ensureItemSummary() re-renders once it arrives.
     const feed = state.feeds.find((f) => f.id === item.feed_id);
-    const imgCandidates = summaryHasImage ? [] : [item.image, feed?.image_url].filter(Boolean);
+    const summaryLoading = item.summary === undefined;
+    const imgCandidates = (summaryHasImage || summaryLoading) ? [] : [item.image, feed?.image_url].filter(Boolean);
     const img = document.getElementById('reading-pane-image');
     let imgIdx = 0;
     img.onerror = () => {

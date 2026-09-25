@@ -1386,6 +1386,9 @@ body.resizing-reading-pane {
 
 .summary img { max-width: 100%; border-radius: 6px; }
 
+.summary-lead-image { margin-bottom: 8px; }
+.summary-lead-image img { display: block; }
+
 .summary table {
   border-collapse: collapse;
   width: 100%;
