@@ -1627,6 +1627,7 @@
     const list = document.getElementById('item-list');
     list.innerHTML = '';
     hoveredItem = null;
+    resetPrefetch();
 
     document.getElementById('item-list-empty').hidden = state.items.length !== 0;
 
@@ -1780,6 +1781,7 @@
       }
 
       list.appendChild(li);
+      observeRowForPrefetch(li, item);
     });
 
     // The reading pane mirrors whatever's selected, but a reload (folder switch,
@@ -1981,6 +1983,105 @@
     } finally {
       pendingSummaryFetches.delete(item);
     }
+  }
+
+  // ---------- Prefetching summaries for visible rows ----------
+
+  // Starts downloading the summary of whatever rows are on screen, so opening
+  // one usually shows its content immediately instead of "Loading…" (which for
+  // description-less feeds like Hacker News means a server-side article scrape).
+  // Capped at a few requests at once so a 200-item list doesn't fire 200 fetches.
+  const PREFETCH_CONCURRENCY = 3;
+  // A row has to stay visible this long before it's queued, so flinging past
+  // rows while scrolling doesn't fetch every one of them.
+  const PREFETCH_DWELL_MS = 250;
+  let prefetchQueue = [];
+  let prefetchActive = 0;
+  const prefetchTimers = new Map(); // li -> timeout id
+  const itemByRow = new WeakMap(); // li -> item (ids alone can repeat, see renderItems)
+
+  function enqueuePrefetch(item) {
+    if (item.summary !== undefined) {
+      preloadItemImages(item);
+      return;
+    }
+    if (pendingSummaryFetches.has(item) || prefetchQueue.includes(item)) return;
+    prefetchQueue.push(item);
+    pumpPrefetch();
+  }
+
+  function pumpPrefetch() {
+    if (document.hidden) return;
+    while (prefetchActive < PREFETCH_CONCURRENCY && prefetchQueue.length) {
+      const item = prefetchQueue.shift();
+      prefetchActive += 1;
+      ensureItemSummary(item).finally(() => {
+        prefetchActive -= 1;
+        preloadItemImages(item);
+        pumpPrefetch();
+      });
+    }
+  }
+
+  // Warms the browser cache with the images the reading pane will show for this
+  // item — the ones inside the summary, or the header image when the summary has
+  // none (mirroring renderReadingPane()'s choice) — so they appear instantly too.
+  // Capped per item so an image-heavy article doesn't pull down dozens up front.
+  const PREFETCH_MAX_IMAGES_PER_ITEM = 6;
+  const imagesPreloadedFor = new WeakSet();
+  // Holds the Image objects until they settle so they can't be garbage-collected
+  // (and their download abandoned) mid-flight.
+  const inflightImagePreloads = new Set();
+
+  function preloadItemImages(item) {
+    if (item.summary === undefined || imagesPreloadedFor.has(item)) return;
+    imagesPreloadedFor.add(item);
+    const summaryImgs = item.summary ? Array.from(sanitizeHtml(item.summary).querySelectorAll('img[src]'), (img) => img.getAttribute('src')) : [];
+    const urls = summaryImgs.length ? summaryImgs : [item.image].filter(Boolean);
+    Array.from(new Set(urls)).slice(0, PREFETCH_MAX_IMAGES_PER_ITEM).forEach((url) => {
+      const img = new Image();
+      inflightImagePreloads.add(img);
+      img.onload = img.onerror = () => inflightImagePreloads.delete(img);
+      img.src = url;
+    });
+  }
+
+  document.addEventListener('visibilitychange', pumpPrefetch);
+
+  const prefetchObserver = 'IntersectionObserver' in window
+    ? new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        const li = entry.target;
+        const item = itemByRow.get(li);
+        if (!item) return;
+        if (entry.isIntersecting) {
+          if (prefetchTimers.has(li)) return;
+          prefetchTimers.set(li, setTimeout(() => {
+            prefetchTimers.delete(li);
+            enqueuePrefetch(item);
+          }, PREFETCH_DWELL_MS));
+        } else {
+          clearTimeout(prefetchTimers.get(li));
+          prefetchTimers.delete(li);
+          // Scrolled away before its turn came — keep the queue to what's on screen.
+          prefetchQueue = prefetchQueue.filter((queued) => queued !== item);
+        }
+      });
+    }, { root: document.getElementById('item-pane'), rootMargin: '200px 0px' })
+    : null;
+
+  function resetPrefetch() {
+    if (prefetchObserver) prefetchObserver.disconnect();
+    prefetchTimers.forEach((timer) => clearTimeout(timer));
+    prefetchTimers.clear();
+    // In-flight fetches are left to finish; their result is cached on the item.
+    prefetchQueue = [];
+  }
+
+  function observeRowForPrefetch(li, item) {
+    if (!prefetchObserver) return;
+    itemByRow.set(li, item);
+    prefetchObserver.observe(li);
   }
 
   function renderReadingPane(item) {

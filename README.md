@@ -11,6 +11,7 @@ A minimal, self-hosted RSS/Atom/JSON feed reader for one person. Plain PHP (no f
 - Read/unread and starred tracking, personal notes and tags on items (tag autocomplete, browsable sidebar tag list, a "Notes" view for items with a note attached), per-feed content filters, per-feed enable/disable
 - Manual refresh or scheduled refresh (cron/launchd/URL-based), with per-feed refresh intervals (auto-detected from feeds that declare their own, editable otherwise)
 - Favicons and item thumbnails resolved automatically, no third-party services
+- Visible items (and their images) are prefetched in the background, so opening one is instant
 - OPML import/export and full backup/restore (zip/gzip/JSON)
 - Single-user login (bcrypt password, PHP session) — no database, no third-party auth
 
