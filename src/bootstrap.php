@@ -37,7 +37,14 @@ if (PHP_SAPI !== 'cli') {
         'secure' => (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'),
     ];
     session_set_cookie_params(['lifetime' => SESSION_LIFETIME_SECONDS] + $cookieParams);
-    session_start();
+
+    // Only resume a session the browser already has. Starting one for every request
+    // left an empty session file behind for each cookie-less hit (URL cron runs, bots,
+    // the login screen) until PHP's 30-day GC got to it. A new session is started only
+    // when someone actually logs in — see Auth::markLoggedIn().
+    if (isset($_COOKIE[session_name()])) {
+        session_start();
+    }
 
     // PHP only sends the cookie when the session id is created, so without this
     // the login would expire a fixed 30 days after logging in; re-sending it

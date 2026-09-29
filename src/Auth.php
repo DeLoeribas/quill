@@ -41,7 +41,18 @@ final class Auth
     public static function logout(): void
     {
         $_SESSION = [];
-        session_destroy();
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_destroy();
+        }
+        // Drop the cookie too, so later requests don't resume (and recreate) an empty session.
+        $params = session_get_cookie_params();
+        setcookie(session_name(), '', [
+            'expires' => time() - 3600,
+            'path' => $params['path'],
+            'secure' => $params['secure'],
+            'httponly' => $params['httponly'],
+            'samesite' => $params['samesite'],
+        ]);
     }
 
     public static function requireLogin(): void
@@ -53,6 +64,10 @@ final class Auth
 
     private static function markLoggedIn(): void
     {
+        // bootstrap.php only resumes existing sessions; logging in is where a new one starts.
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            session_start();
+        }
         session_regenerate_id(true);
         $_SESSION['authenticated'] = true;
     }
