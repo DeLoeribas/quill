@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../src/bootstrap.php';
 require_once __DIR__ . '/../../src/ArticleSummaryResolver.php';
+require_once __DIR__ . '/../../src/ArticlePageTextResolver.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 Auth::requireLogin();
@@ -81,6 +82,8 @@ if ($method === 'GET') {
     $items = [];
     foreach ($feedIds as $fid) {
         $itemsData = read_items_file($fid);
+        // Only a search needs the (much larger) captured page texts.
+        $pageTexts = empty($queryPatterns) ? [] : read_page_texts($fid);
         foreach ($itemsData['items'] as $item) {
             if ($unreadOnly && !empty($item['read'])) {
                 continue;
@@ -95,7 +98,7 @@ if ($method === 'GET') {
                 continue;
             }
             $feedTitle = $feedTitleById[$fid] ?? null;
-            if (!item_matches_query($item, $feedTitle, $queryPatterns)) {
+            if (!item_matches_query($item, $feedTitle, $queryPatterns, $pageTexts[$item['id']]['text'] ?? null)) {
                 continue;
             }
             $item['feed_id'] = $fid;
@@ -253,6 +256,47 @@ if ($method === 'POST') {
         }
 
         json_response(['ok' => true, 'tags' => $tags]);
+    }
+
+    // Fired (unawaited) by the client when an item is opened via Show page / Return:
+    // fetches the linked page once and stores its text so search can match on it.
+    if ($action === 'capture_page') {
+        $feedId = (string) ($body['feed_id'] ?? '');
+        $itemId = (string) ($body['item_id'] ?? '');
+        if ($feedId === '' || $itemId === '') {
+            json_error('feed_id and item_id are required');
+        }
+
+        $link = null;
+        foreach (read_items_file($feedId)['items'] as $item) {
+            if ($item['id'] === $itemId) {
+                $link = $item['link'] ?? null;
+                break;
+            }
+        }
+        if ($link === null || $link === '') {
+            json_error('item not found or has no link', 404);
+        }
+
+        if (array_key_exists($itemId, read_page_texts($feedId))) {
+            json_response(['ok' => true, 'cached' => true]);
+        }
+
+        // The fetch can take seconds; don't hold the session lock (which would
+        // stall every other request from this browser) while it runs.
+        session_write_close();
+
+        $text = ArticlePageTextResolver::resolve($link);
+        if ($text === null) {
+            json_response(['ok' => false, 'cached' => false]);
+        }
+
+        Storage::update(page_texts_file_path($feedId), [], function (array $data) use ($itemId, $text) {
+            $data[$itemId] = ['text' => $text, 'fetched_at' => now_iso8601()];
+            return $data;
+        });
+
+        json_response(['ok' => true, 'cached' => false, 'length' => strlen($text)]);
     }
 
     if ($action === 'mark_all_read') {

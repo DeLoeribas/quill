@@ -278,7 +278,7 @@ final class RefreshService
         $path = items_file_path($feedId);
         $default = ['feed_id' => $feedId, 'items' => [], 'evicted_ids' => []];
 
-        Storage::update($path, $default, function (array $data) use ($parsedItems, $filters, &$newCount) {
+        $finalData = Storage::update($path, $default, function (array $data) use ($parsedItems, $filters, &$newCount) {
             $byId = [];
             foreach ($data['items'] as $item) {
                 $byId[$item['id']] = $item;
@@ -388,7 +388,29 @@ final class RefreshService
             return $data;
         });
 
+        self::prunePageTexts($feedId, array_column($finalData['items'], 'id'));
+
         return $newCount;
+    }
+
+    /**
+     * Drops captured page texts for items that were just pruned from the feed.
+     * Runs after the items lock is released, so the two files are never locked
+     * at the same time.
+     *
+     * @param string[] $keptItemIds
+     */
+    private static function prunePageTexts(string $feedId, array $keptItemIds): void
+    {
+        $pagesPath = page_texts_file_path($feedId);
+        if (!is_file($pagesPath)) {
+            return;
+        }
+        $kept = array_flip($keptItemIds);
+        if (array_diff_key(read_page_texts($feedId), $kept) === []) {
+            return;
+        }
+        Storage::update($pagesPath, [], fn (array $data) => array_intersect_key($data, $kept));
     }
 
     /** @param string[] $filters */

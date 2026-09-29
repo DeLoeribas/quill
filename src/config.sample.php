@@ -4,6 +4,8 @@
 
 define('DATA_DIR', dirname(__DIR__) . '/data');
 define('ITEMS_DIR', DATA_DIR . '/items');
+// Text captured from articles' linked pages when opened, for full-text search.
+define('PAGES_DIR', DATA_DIR . '/pages');
 define('FEEDS_FILE', DATA_DIR . '/feeds.json');
 define('CRON_LOG_FILE', DATA_DIR . '/cron.log');
 // Path the README's cron/launchd examples redirect stderr to; capped alongside CRON_LOG_FILE.

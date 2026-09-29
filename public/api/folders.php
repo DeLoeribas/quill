@@ -146,10 +146,7 @@ if ($method === 'DELETE') {
     }
 
     foreach ($removedFeedIds as $feedId) {
-        $itemsPath = items_file_path($feedId);
-        if (is_file($itemsPath)) {
-            unlink($itemsPath);
-        }
+        delete_feed_data_files($feedId);
     }
 
     json_response(['ok' => true, 'feeds_removed' => count($removedFeedIds)]);

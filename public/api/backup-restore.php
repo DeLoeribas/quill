@@ -118,10 +118,7 @@ foreach ($restoredFeedIds as $feedId) {
 // orphaned — same cleanup OpmlImporter::import() does for removed feeds.
 $orphanedFeedIds = array_diff($previousFeedIds, $restoredFeedIds);
 foreach ($orphanedFeedIds as $feedId) {
-    $path = items_file_path($feedId);
-    if (is_file($path)) {
-        unlink($path);
-    }
+    delete_feed_data_files($feedId);
 }
 
 json_response([

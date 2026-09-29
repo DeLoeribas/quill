@@ -2596,6 +2596,8 @@
   async function openItem(item, rowEl) {
     if (item.link) {
       window.open(item.link, '_blank', 'noopener,noreferrer');
+      // Server fetches and stores the page's text (once) so search can find it later.
+      post('items.php', { action: 'capture_page', feed_id: item.feed_id, item_id: item.id }).catch(() => {});
     }
     await markItemRead(item, rowEl);
   }

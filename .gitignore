@@ -3,6 +3,7 @@
 /data/login_attempts.json
 /data/sessions/
 /data/items/*.json
+/data/pages/
 /data/cron.log
 /data/cron-stderr.log
 /data/github_version.json

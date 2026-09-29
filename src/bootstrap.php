@@ -264,10 +264,34 @@ if (!defined('FETCH_RETRY_ATTEMPTS')) {
 if (!defined('FETCH_TRANSIENT_TOLERANCE')) {
     define('FETCH_TRANSIENT_TOLERANCE', 3);
 }
+if (!defined('PAGES_DIR')) {
+    define('PAGES_DIR', DATA_DIR . '/pages');
+}
 
 function read_items_file(string $feedId): array
 {
     return Storage::read(items_file_path($feedId), ['feed_id' => $feedId, 'items' => []]);
+}
+
+/** Per-feed store of opened articles' page text, keyed by item id: { "<itemId>": { "text": ..., "fetched_at": ... } }. Kept out of the items file so list requests don't pay for it. */
+function page_texts_file_path(string $feedId): string
+{
+    return PAGES_DIR . '/' . $feedId . '.json';
+}
+
+function read_page_texts(string $feedId): array
+{
+    return Storage::read(page_texts_file_path($feedId), []);
+}
+
+/** Deletes a feed's items file and its stored page texts, when the feed itself is removed. */
+function delete_feed_data_files(string $feedId): void
+{
+    foreach ([items_file_path($feedId), page_texts_file_path($feedId)] as $path) {
+        if (is_file($path)) {
+            unlink($path);
+        }
+    }
 }
 
 /** Pure helper: extracts the default interval from an already-loaded feeds.json array. Safe to call from inside a Storage::update mutator (no file I/O, so no nested flock on the same file). */
@@ -405,13 +429,13 @@ function search_query_patterns(string $query): array
     );
 }
 
-/** True if an item's title/summary plus its feed title match every pattern from search_query_patterns() (vacuously true for an empty pattern list). */
-function item_matches_query(array $item, ?string $feedTitle, array $queryPatterns): bool
+/** True if an item's title/summary/note, its feed title and its captured page text (if any) match every pattern from search_query_patterns() (vacuously true for an empty pattern list). */
+function item_matches_query(array $item, ?string $feedTitle, array $queryPatterns, ?string $pageText = null): bool
 {
     if (empty($queryPatterns)) {
         return true;
     }
-    $haystack = fold_accents(strip_tags(($item['title'] ?? '') . ' ' . ($item['summary'] ?? '') . ' ' . ($item['comment'] ?? '') . ' ' . ($feedTitle ?? '')));
+    $haystack = fold_accents(strip_tags(($item['title'] ?? '') . ' ' . ($item['summary'] ?? '') . ' ' . ($item['comment'] ?? '') . ' ' . ($feedTitle ?? '')) . ' ' . ($pageText ?? ''));
     foreach ($queryPatterns as $pattern) {
         if (!preg_match($pattern, $haystack)) {
             return false;
@@ -427,8 +451,9 @@ function match_count_for_query(string $query, array $feeds): int
     $count = 0;
     foreach ($feeds as $feed) {
         $itemsData = read_items_file($feed['id']);
+        $pageTexts = empty($queryPatterns) ? [] : read_page_texts($feed['id']);
         foreach ($itemsData['items'] as $item) {
-            if (item_matches_query($item, $feed['title'] ?? null, $queryPatterns)) {
+            if (item_matches_query($item, $feed['title'] ?? null, $queryPatterns, $pageTexts[$item['id']]['text'] ?? null)) {
                 $count++;
             }
         }

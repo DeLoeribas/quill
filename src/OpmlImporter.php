@@ -50,10 +50,7 @@ final class OpmlImporter
         $actuallyRemovedIds = array_diff($removedFeedIds, $newFeedIds);
 
         foreach ($actuallyRemovedIds as $feedId) {
-            $path = items_file_path($feedId);
-            if (is_file($path)) {
-                unlink($path);
-            }
+            delete_feed_data_files($feedId);
         }
 
         return [

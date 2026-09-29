@@ -231,10 +231,7 @@ if ($method === 'DELETE') {
         json_error('feed not found', 404);
     }
 
-    $itemsPath = items_file_path($id);
-    if (is_file($itemsPath)) {
-        unlink($itemsPath);
-    }
+    delete_feed_data_files($id);
 
     json_response(['ok' => true]);
 }
