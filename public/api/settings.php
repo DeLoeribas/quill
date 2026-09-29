@@ -14,6 +14,7 @@ if ($method === 'GET') {
     json_response([
         'app_version' => $version['version'],
         'latest_version' => $version['latest'],
+        'update_notes' => $version['notes'],
         'last_build_date' => last_build_date(),
         'server_name' => server_name(),
         'php_version' => phpversion(),

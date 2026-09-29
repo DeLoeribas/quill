@@ -169,7 +169,7 @@ Cron output counts these separately as `deferred=`, so absorbed failures never i
    ```
    bin/package-for-deploy.sh
    ```
-   which uses `git archive` to build a clean copy in `./deploy/` containing only what's tracked in git — no personal data, ever. It also stamps `deploy/src/version.php` with `git describe --tags --abbrev=0` for the commit being packaged (shown in the app's footer — see "Versioning" below), and creates `deploy/src/config.php` from `config.sample.php` for you, with `CRON_TOKEN` left blank — the script prints a reminder to generate one yourself and set it in that file before uploading if you want scheduled refresh via `public/cron.php` (see "Scheduled refresh" → Option A below); store the generated value somewhere safe, since it can't be recovered from the server afterwards. Upload the contents of `./deploy/`. Point the site's **document root** at `public/` if your host allows it — this keeps `src/` and `data/` outside the web-exposed folder entirely, which is the safest setup.
+   which uses `git archive` to build a clean copy in `./deploy/` containing only what's tracked in git — no personal data, ever. It also creates `deploy/src/config.php` from `config.sample.php` for you, with `CRON_TOKEN` left blank — the script prints a reminder to generate one yourself and set it in that file before uploading if you want scheduled refresh via `public/cron.php` (see "Scheduled refresh" → Option A below); store the generated value somewhere safe, since it can't be recovered from the server afterwards. Upload the contents of `./deploy/`. Point the site's **document root** at `public/` if your host allows it — this keeps `src/` and `data/` outside the web-exposed folder entirely, which is the safest setup.
 2. If your host only exposes a single folder (e.g. `public_html` *is* the repo root, `public/` can't be the doc root), the `.htaccess` files in `data/` and `src/` deny all direct requests to those folders as a fallback — but a document root above the repo is still preferable when available.
 3. **Optionally, also protect the site with HTTP Basic Auth** as an extra layer in front of the app's own login (step 4 below is what actually keeps strangers out on its own — this is defense-in-depth on top of that, and is disabled by default). `public/.htaccess` ships with the relevant lines commented out:
    ```
@@ -188,18 +188,27 @@ Cron output counts these separately as `deferred=`, so absorbed failures never i
 
 ## Versioning
 
-The app's footer shows a version, e.g. `a1b2c3d` or `dev`. There's no hand-maintained version constant — each run of `bin/package-for-deploy.sh` stamps `src/version.php` with the short commit hash (`git rev-parse --short HEAD`) of whatever commit it's archiving at that moment, so it's always accurate to what's actually deployed even though every install is packaged and uploaded independently. Running the app locally (unpackaged) shows `dev`, since `src/version.php` only ever exists inside a packaged copy. Using the commit hash rather than a tag means the "update available" check below works on every deploy, whether or not you bother tagging releases.
+The version lives in `src/version.json`, which is committed to the repo:
 
-The footer also checks GitHub for a newer commit on `main` (cached server-side for up to `GITHUB_VERSION_CACHE_SECONDS`, 6 hours by default). It compares the deployed files in `public/`, `src/` and `cron/` themselves (by git blob hash, ignoring `.htaccess` files and anything not in the repo like `config.php`) against that commit — not `src/version.php` — so copying changed files over by hand is enough for it to notice you're up to date. When everything matches, the footer shows that commit's hash as the version; when any file differs or is missing, an "Update available (…)" badge appears linking to the repo. The check is skipped when running from a git working copy (local development), since uncommitted edits would always trigger it.
+```json
+{
+    "version": "1.0.0",
+    "notes": "One line about what's new in this version."
+}
+```
+
+To release, bump `version` (and update `notes`) and push to `main`. Pushing without bumping the number doesn't notify anyone.
+
+Each install's server fetches the same file from GitHub (`raw.githubusercontent.com/<GITHUB_REPO>/main/src/version.json`, cached for `GITHUB_VERSION_CACHE_SECONDS`, 6 hours by default) and compares the two numbers. Only when GitHub's number is **higher** does the footer show "Version X available", linking to the commit history, with the notes as its tooltip. An install that's equal to or ahead of GitHub (e.g. deployed before pushing) never sees it. The ✕ on the notice hides it until the next version; Settings → Version always shows the current state. Because `version.json` sits in `src/`, copying the updated files over by hand updates it along with the code. If GitHub can't be reached, or the repo isn't public, no notice is shown.
 
 ## Updating
 
-The badge only tells you a newer commit exists — it doesn't fetch or install anything for you. To actually update a deployed install:
+The notice only tells you a newer version exists — it doesn't fetch or install anything for you. To actually update a deployed install:
 
 1. **Get the new code.** If you deployed from a git clone, `git pull`. If you only ever downloaded a zip, grab a fresh zip of `main` from the repo instead.
-2. **Repackage it.** From a git clone, run `bin/package-for-deploy.sh` again to build a fresh `./deploy/` stamped with the new commit hash. (This step needs an actual git checkout — it shells out to `git archive`/`git rev-parse`, so it won't run against a bare downloaded zip.)
+2. **Repackage it.** From a git clone, run `bin/package-for-deploy.sh` again to build a fresh `./deploy/`. (This step needs an actual git checkout — it shells out to `git archive`/`git rev-parse`, so it won't run against a bare downloaded zip.)
 3. **Upload only the app code — not your data.** Overwrite the server's `public/` and `src/*.php` files with the new ones. **Do not** upload the freshly generated `deploy/src/config.php` — it's rebuilt from `config.sample.php` every run and will wipe your real login credentials and `CRON_TOKEN` if you overwrite the live one with it. Leave `data/` alone entirely; nothing in this process touches your feeds, read state, or saved items.
-4. **No git available on the server or locally?** Manually copy the changed files from the new zip over the old ones (same exclusions as above). No version file needs editing — the badge compares the files themselves. After uploading, it can take up to `GITHUB_VERSION_CACHE_SECONDS` (6 hours) for a new commit to be noticed; delete `data/github_version.json` on the server to force a re-check.
+4. **No git available on the server or locally?** Manually copy the changed files from the new zip over the old ones (same exclusions as above), including `src/version.json` — that's what tells the app which version it is.
 
 ## Project layout
 

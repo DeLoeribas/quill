@@ -83,6 +83,11 @@
     </section>
 
     <section class="modal-section">
+      <label>Version</label>
+      <p id="settings-version-text" class="settings-version-text"></p>
+    </section>
+
+    <section class="modal-section">
       <label>Account</label>
       <div class="modal-row">
         <button id="settings-logout-btn" type="button">Log out</button>
@@ -285,7 +290,10 @@
 
 <footer id="app-footer" hidden>
   <span id="app-footer-text"></span>
-  <a id="app-footer-update-badge" class="update-badge" href="https://github.com/DeLoeribas/quill" target="_blank" rel="noopener" hidden></a>
+  <span id="app-footer-update-badge" class="update-badge" hidden>
+    <a id="app-footer-update-link" href="https://github.com/DeLoeribas/quill/commits/main" target="_blank" rel="noopener"></a>
+    <button id="app-footer-update-dismiss" type="button" aria-label="Dismiss until the next version" title="Dismiss until the next version">✕</button>
+  </span>
 </footer>
 
 <div id="toast" hidden></div>

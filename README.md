@@ -54,7 +54,7 @@ The manual "Refresh all" button always force-refreshes regardless of interval.
 >
 > **Leave `data/` alone entirely.**
 >
-> The footer shows the deployed version and flags when a newer commit exists on GitHub.
+> The footer shows a notice when a higher version number is on GitHub (from `src/version.json`) — bump that number to release an update.
 
 ## Project layout
 

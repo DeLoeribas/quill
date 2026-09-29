@@ -545,6 +545,7 @@
     const data = await get('settings.php');
     state.appVersion = data.app_version;
     state.latestVersion = data.latest_version;
+    state.updateNotes = data.update_notes || null;
     state.lastBuildDate = data.last_build_date;
     state.serverName = data.server_name;
     state.phpVersion = data.php_version;
@@ -579,6 +580,7 @@
       state.sidebarCollapsed = prefs.sidebar_collapsed;
       applySidebarCollapsed(state.sidebarCollapsed);
     }
+    state.dismissedUpdateVersion = typeof prefs.dismissed_update_version === 'string' ? prefs.dismissed_update_version : null;
     state.serverLastFilter = prefs.last_filter || null;
     state.serverSelectedItemId = typeof prefs.selected_item_id === 'string' ? prefs.selected_item_id : null;
   }
@@ -604,17 +606,41 @@
 
     const badge = document.getElementById('app-footer-update-badge');
     const latest = state.latestVersion;
-    const current = state.appVersion;
-    // Belt and braces with the server check: never offer an "update" to the build already running
-    // (short shas can differ in length, so compare by prefix).
-    const isCurrentBuild = latest && current && (latest.startsWith(current) || current.startsWith(latest));
-    if (latest && !isCurrentBuild) {
-      badge.textContent = `Update available (${state.latestVersion})`;
+    // The server only reports a version that's actually higher than the running one.
+    if (latest && latest !== state.dismissedUpdateVersion) {
+      const link = document.getElementById('app-footer-update-link');
+      link.textContent = `Version ${latest} available`;
+      link.title = state.updateNotes || 'See what changed on GitHub';
       badge.hidden = false;
     } else {
       badge.hidden = true;
     }
   }
+
+  function renderSettingsVersion() {
+    const el = document.getElementById('settings-version-text');
+    el.textContent = '';
+    if (!state.latestVersion) {
+      el.textContent = `Quill ${state.appVersion || ''} — up to date`;
+      return;
+    }
+    el.append(`Quill ${state.appVersion} — version ${state.latestVersion} is available. `);
+    if (state.updateNotes) {
+      el.append(state.updateNotes + ' ');
+    }
+    const link = document.createElement('a');
+    link.href = 'https://github.com/DeLoeribas/quill/commits/main';
+    link.target = '_blank';
+    link.rel = 'noopener';
+    link.textContent = 'What changed';
+    el.appendChild(link);
+  }
+
+  document.getElementById('app-footer-update-dismiss').addEventListener('click', () => {
+    state.dismissedUpdateVersion = state.latestVersion;
+    saveUiPref({ dismissed_update_version: state.latestVersion });
+    renderAppFooter();
+  });
 
   function renderLastUpdated() {
     const el = document.getElementById('last-updated');
@@ -2902,6 +2928,7 @@
     closeSidebar();
     document.getElementById('settings-sort-feeds-alpha').checked = state.sortFeedsAlphabetically;
     document.getElementById('settings-mark-read-on-nav').checked = state.markReadOnNav;
+    renderSettingsVersion();
     document.getElementById('settings-overlay').hidden = false;
   }
 

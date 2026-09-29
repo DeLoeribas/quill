@@ -233,18 +233,22 @@ function server_name(): string
     return $_SERVER['SERVER_NAME'] ?? $_SERVER['HTTP_HOST'] ?? (gethostname() ?: 'unknown');
 }
 
-// APP_VERSION is stamped into src/version.php by bin/package-for-deploy.sh at package
-// time, from the exact commit being archived — deployments are independent snapshots
-// per host, not live git checkouts, so this can't be a hand-maintained constant.
-// version.php doesn't exist in the repo (gitignored); local dev falls back to 'dev'.
-// It's only a fallback label now: the footer shows the matching GitHub commit instead
-// whenever the deployed files match it (see GithubVersionChecker), and the update
-// check never reads it.
-if (file_exists(__DIR__ . '/version.php')) {
-    require_once __DIR__ . '/version.php';
-} else {
-    define('APP_VERSION', 'dev');
+// APP_VERSION comes from src/version.json, which is committed and bumped by hand for
+// each release. Because it lives in src/, a hand-copied update carries it along with the
+// code; GithubVersionChecker compares it to the same file on GitHub.
+/** @return array{version: ?string, notes: ?string} */
+function parse_version_json(?string $raw): array
+{
+    $data = json_decode((string) $raw, true);
+    $version = is_array($data) && is_string($data['version'] ?? null) ? trim($data['version']) : '';
+    $notes = is_array($data) && is_string($data['notes'] ?? null) ? trim($data['notes']) : '';
+    return [
+        'version' => preg_match('/^\d+(\.\d+){0,3}$/', $version) === 1 ? $version : null,
+        'notes' => $notes === '' ? null : $notes,
+    ];
 }
+
+define('APP_VERSION', parse_version_json(@file_get_contents(__DIR__ . '/version.json') ?: null)['version'] ?? 'unknown');
 
 // Fallback defaults for constants added to config.sample.php after this app's
 // first release — an in-place code update never touches the live config.php (see
@@ -348,6 +352,11 @@ function sanitize_ui_prefs(array $prefs): array
         && $prefs['item_pane_width'] >= 280 && $prefs['item_pane_width'] <= 800) {
         // Keep 280/800 in sync with ITEM_PANE_WIDTH_MIN/MAX in app.js.
         $out['item_pane_width'] = $prefs['item_pane_width'];
+    }
+
+    // The update version the user dismissed the footer notice for; a newer one shows it again.
+    if (isset($prefs['dismissed_update_version']) && is_string($prefs['dismissed_update_version'])) {
+        $out['dismissed_update_version'] = $prefs['dismissed_update_version'];
     }
 
     if (isset($prefs['selected_item_id']) && is_string($prefs['selected_item_id'])) {

@@ -8,7 +8,6 @@
 /data/cron-stderr.log
 /data/github_version.json
 /src/config.php
-/src/version.php
 /.htpasswd
 .DS_Store
 *.opml

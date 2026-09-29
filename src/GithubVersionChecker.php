@@ -3,164 +3,68 @@
 declare(strict_types=1);
 
 /**
- * Decides whether a newer version is on GitHub by comparing the deployed code
- * files themselves against the latest commit on main, file by file (by git blob
- * hash). Deliberately independent of src/version.php: updates are often done by
- * hand-copying changed files, which leaves a stale version.php behind and made
- * the old "compare APP_VERSION to the latest sha" check nag forever.
+ * Decides whether a newer release is available by comparing the local
+ * src/version.json to the same file on GitHub's main branch. Only a higher version
+ * number counts: an install that is equal to or ahead of GitHub (e.g. deployed before
+ * pushing) never gets the notice. Earlier versions compared commits and then file
+ * hashes, which could only tell "different", not "newer", and so kept offering
+ * updates that weren't.
+ *
+ * Fetched from raw.githubusercontent.com: one small file, not subject to the API rate limit.
  */
 final class GithubVersionChecker
 {
-    private const MAX_RESPONSE_BYTES = 524288;
+    private const MAX_RESPONSE_BYTES = 16384;
 
     /**
-     * Minimum cache age before a file mismatch triggers an early re-check. Without it, a
-     * deploy of a commit pushed after the cache was written compared the new files to the
-     * cached (older) commit and offered that older commit as an "update" for up to
-     * GITHUB_VERSION_CACHE_SECONDS. 5 minutes keeps it to ≤24 unauthenticated API calls an
-     * hour (GitHub allows 60) even when the files never match (e.g. hand-edited ones).
-     */
-    private const MIN_RECHECK_SECONDS = 300;
-
-    /** Only the app code that gets uploaded is compared — data/, docs and dev tooling can differ freely. */
-    private const COMPARED_PREFIXES = ['public/', 'src/', 'cron/'];
-
-    /** Files users are told to edit in place (e.g. enabling Basic Auth in public/.htaccess) — never compared. */
-    private const IGNORED_BASENAMES = ['.htaccess'];
-
-    /**
-     * Returns ['version' => what the footer should show, 'latest' => short sha of the
-     * newer commit, or null if up to date / unknown / GitHub unreachable].
+     * Returns ['version' => the running version, 'latest' => the newer version on
+     * GitHub or null if up to date / unknown / GitHub unreachable, 'notes' => that
+     * newer version's one-line release notes, if any].
      */
     public static function status(): array
     {
-        $root = dirname(__DIR__);
+        $upToDate = ['version' => APP_VERSION, 'latest' => null, 'notes' => null];
 
-        // A local git working copy nearly always has uncommitted edits, which would
-        // make the badge show permanently; there's nothing useful to compare there.
-        if (is_dir($root . '/.git')) {
-            return ['version' => APP_VERSION, 'latest' => null];
+        $remote = self::remoteVersion();
+        if ($remote === null || $remote['version'] === null || APP_VERSION === 'unknown') {
+            return $upToDate;
         }
 
-        $latest = self::latestCommit();
-        if ($latest === null) {
-            return ['version' => APP_VERSION, 'latest' => null];
+        if (version_compare($remote['version'], APP_VERSION, '>')) {
+            return ['version' => APP_VERSION, 'latest' => $remote['version'], 'notes' => $remote['notes']];
         }
 
-        if (!self::isUpToDate($root, $latest)) {
-            // The cached commit may simply predate what was just deployed — ask GitHub
-            // again (throttled) before claiming an update exists.
-            $latest = self::latestCommit(true) ?? $latest;
-        }
-
-        $shortSha = substr($latest['sha'], 0, 7);
-        if (self::isUpToDate($root, $latest)) {
-            return ['version' => $shortSha, 'latest' => null];
-        }
-
-        return ['version' => APP_VERSION, 'latest' => $shortSha];
+        return $upToDate;
     }
 
-    /** @param array{sha: string, files: array<string, string>} $latest */
-    private static function isUpToDate(string $root, array $latest): bool
+    /** @return array{version: ?string, notes: ?string}|null */
+    private static function remoteVersion(): ?array
     {
-        // If the build is already stamped with the latest commit, never offer it as an update —
-        // a file differing (e.g. an edited public/ file) doesn't make "update to what you have" useful.
-        // Prefix match both ways: `git rev-parse --short` can yield more than 7 chars.
-        return self::isSameCommit(APP_VERSION, $latest['sha'])
-            || self::localFilesMatch($root, $latest['files']);
-    }
-
-    /** True if $version is an abbreviation (≥7 hex chars) of the full commit $sha. */
-    private static function isSameCommit(string $version, string $sha): bool
-    {
-        return preg_match('/^[0-9a-f]{7,40}$/', $version) === 1 && str_starts_with($sha, $version);
-    }
-
-    /** True if every compared file in the commit exists locally with identical contents. Extra local files (config.php, version.php) are ignored. */
-    private static function localFilesMatch(string $root, array $files): bool
-    {
-        foreach ($files as $path => $blobSha) {
-            $contents = @file_get_contents($root . '/' . $path);
-            if ($contents === false) {
-                return false;
-            }
-            if (sha1('blob ' . strlen($contents) . "\0" . $contents) !== $blobSha) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    /** @return array{sha: string, files: array<string, string>}|null */
-    private static function latestCommit(bool $recheck = false): ?array
-    {
-        $empty = ['sha' => null, 'files' => null, 'checked_at' => null];
+        $empty = ['version' => null, 'notes' => null, 'checked_at' => null];
         $cache = Storage::read(GITHUB_VERSION_CACHE_FILE, $empty);
         $checkedAt = $cache['checked_at'] ?? null;
-        $maxAge = $recheck ? self::MIN_RECHECK_SECONDS : GITHUB_VERSION_CACHE_SECONDS;
-        // A cache written by the old checker has no 'files' — treat it as stale.
+        // A cache written by the old commit-based checker has no 'version' key — treat it as stale.
         $stale = $checkedAt === null
-            || !is_array($cache['files'] ?? null)
-            || (time() - strtotime((string) $checkedAt)) >= $maxAge;
+            || !array_key_exists('version', $cache)
+            || (time() - strtotime((string) $checkedAt)) >= GITHUB_VERSION_CACHE_SECONDS;
 
         if (!$stale) {
-            return ['sha' => $cache['sha'], 'files' => $cache['files']];
+            return ['version' => $cache['version'], 'notes' => $cache['notes'] ?? null];
         }
 
-        $fetched = self::fetchLatestCommit();
+        $raw = self::fetch('https://raw.githubusercontent.com/' . GITHUB_REPO . '/main/src/version.json');
         // Keep the last-known-good result if GitHub is unreachable right now, but still
         // bump checked_at so we don't retry on every single request while it's down.
-        $result = $fetched ?? (is_string($cache['sha'] ?? null) && is_array($cache['files'] ?? null)
-            ? ['sha' => $cache['sha'], 'files' => $cache['files']]
-            : null);
+        $result = $raw !== null
+            ? parse_version_json($raw)
+            : ['version' => $cache['version'] ?? null, 'notes' => $cache['notes'] ?? null];
 
-        Storage::update(GITHUB_VERSION_CACHE_FILE, $empty, function () use ($result) {
-            return [
-                'sha' => $result['sha'] ?? null,
-                'files' => $result['files'] ?? null,
-                'checked_at' => date(DATE_ATOM),
-            ];
-        });
+        Storage::update(GITHUB_VERSION_CACHE_FILE, $empty, fn () => $result + ['checked_at' => date(DATE_ATOM)]);
 
         return $result;
     }
 
-    /** @return array{sha: string, files: array<string, string>}|null */
-    private static function fetchLatestCommit(): ?array
-    {
-        $api = 'https://api.github.com/repos/' . GITHUB_REPO;
-
-        // The .sha media type returns just the 40-char hash, not the full commit + diff.
-        $sha = trim((string) self::fetch($api . '/commits/main', 'application/vnd.github.sha'));
-        if (!preg_match('/^[0-9a-f]{40}$/', $sha)) {
-            return null;
-        }
-
-        $tree = json_decode((string) self::fetch($api . '/git/trees/' . $sha . '?recursive=1', 'application/vnd.github+json'), true);
-        if (!is_array($tree['tree'] ?? null) || !empty($tree['truncated'])) {
-            return null;
-        }
-
-        $files = [];
-        foreach ($tree['tree'] as $entry) {
-            $path = $entry['path'] ?? '';
-            if (($entry['type'] ?? '') !== 'blob' || !is_string($entry['sha'] ?? null)
-                || in_array(basename($path), self::IGNORED_BASENAMES, true)) {
-                continue;
-            }
-            foreach (self::COMPARED_PREFIXES as $prefix) {
-                if (str_starts_with($path, $prefix)) {
-                    $files[$path] = $entry['sha'];
-                    break;
-                }
-            }
-        }
-
-        return $files === [] ? null : ['sha' => $sha, 'files' => $files];
-    }
-
-    private static function fetch(string $url, string $accept): ?string
+    private static function fetch(string $url): ?string
     {
         $ch = curl_init($url);
         $buffer = '';
@@ -171,7 +75,6 @@ final class GithubVersionChecker
             CURLOPT_TIMEOUT => FETCH_TIMEOUT_SECONDS,
             CURLOPT_CONNECTTIMEOUT => FETCH_CONNECT_TIMEOUT_SECONDS,
             CURLOPT_USERAGENT => FETCH_USER_AGENT,
-            CURLOPT_HTTPHEADER => ['Accept: ' . $accept],
             CURLOPT_WRITEFUNCTION => function ($curl, $chunk) use (&$buffer) {
                 $buffer .= $chunk;
                 if (strlen($buffer) >= self::MAX_RESPONSE_BYTES) {
