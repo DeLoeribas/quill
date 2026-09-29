@@ -13,6 +13,15 @@ final class GithubVersionChecker
 {
     private const MAX_RESPONSE_BYTES = 524288;
 
+    /**
+     * Minimum cache age before a file mismatch triggers an early re-check. Without it, a
+     * deploy of a commit pushed after the cache was written compared the new files to the
+     * cached (older) commit and offered that older commit as an "update" for up to
+     * GITHUB_VERSION_CACHE_SECONDS. 5 minutes keeps it to ≤24 unauthenticated API calls an
+     * hour (GitHub allows 60) even when the files never match (e.g. hand-edited ones).
+     */
+    private const MIN_RECHECK_SECONDS = 300;
+
     /** Only the app code that gets uploaded is compared — data/, docs and dev tooling can differ freely. */
     private const COMPARED_PREFIXES = ['public/', 'src/', 'cron/'];
 
@@ -38,16 +47,28 @@ final class GithubVersionChecker
             return ['version' => APP_VERSION, 'latest' => null];
         }
 
+        if (!self::isUpToDate($root, $latest)) {
+            // The cached commit may simply predate what was just deployed — ask GitHub
+            // again (throttled) before claiming an update exists.
+            $latest = self::latestCommit(true) ?? $latest;
+        }
+
         $shortSha = substr($latest['sha'], 0, 7);
-        // If the build is already stamped with the latest commit, never offer it as an update —
-        // a file differing (e.g. an edited public/ file) doesn't make "update to what you have" useful.
-        // Prefix match both ways: `git rev-parse --short` can yield more than 7 chars.
-        if (self::isSameCommit(APP_VERSION, $latest['sha'])
-            || self::localFilesMatch($root, $latest['files'])) {
+        if (self::isUpToDate($root, $latest)) {
             return ['version' => $shortSha, 'latest' => null];
         }
 
         return ['version' => APP_VERSION, 'latest' => $shortSha];
+    }
+
+    /** @param array{sha: string, files: array<string, string>} $latest */
+    private static function isUpToDate(string $root, array $latest): bool
+    {
+        // If the build is already stamped with the latest commit, never offer it as an update —
+        // a file differing (e.g. an edited public/ file) doesn't make "update to what you have" useful.
+        // Prefix match both ways: `git rev-parse --short` can yield more than 7 chars.
+        return self::isSameCommit(APP_VERSION, $latest['sha'])
+            || self::localFilesMatch($root, $latest['files']);
     }
 
     /** True if $version is an abbreviation (≥7 hex chars) of the full commit $sha. */
@@ -72,15 +93,16 @@ final class GithubVersionChecker
     }
 
     /** @return array{sha: string, files: array<string, string>}|null */
-    private static function latestCommit(): ?array
+    private static function latestCommit(bool $recheck = false): ?array
     {
         $empty = ['sha' => null, 'files' => null, 'checked_at' => null];
         $cache = Storage::read(GITHUB_VERSION_CACHE_FILE, $empty);
         $checkedAt = $cache['checked_at'] ?? null;
+        $maxAge = $recheck ? self::MIN_RECHECK_SECONDS : GITHUB_VERSION_CACHE_SECONDS;
         // A cache written by the old checker has no 'files' — treat it as stale.
         $stale = $checkedAt === null
             || !is_array($cache['files'] ?? null)
-            || (time() - strtotime((string) $checkedAt)) >= GITHUB_VERSION_CACHE_SECONDS;
+            || (time() - strtotime((string) $checkedAt)) >= $maxAge;
 
         if (!$stale) {
             return ['sha' => $cache['sha'], 'files' => $cache['files']];
