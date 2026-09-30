@@ -38,7 +38,7 @@ define('FETCH_TRANSIENT_TOLERANCE', 3);
 // and how often (seconds) to re-check — cached in GITHUB_VERSION_CACHE_FILE between checks.
 define('GITHUB_REPO', 'DeLoeribas/quill');
 define('GITHUB_VERSION_CACHE_FILE', DATA_DIR . '/github_version.json');
-define('GITHUB_VERSION_CACHE_SECONDS', 6 * 3600);
+define('GITHUB_VERSION_CACHE_SECONDS', 3600);
 
 // How many read items to keep per feed before old ones are pruned.
 define('MAX_ITEMS_PER_FEED', 1000);

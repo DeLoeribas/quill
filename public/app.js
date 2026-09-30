@@ -294,6 +294,25 @@
     state.tags = data.tags || [];
   }
 
+  // A tab left open for days should still learn about a new release. The server
+  // itself only asks GitHub once per GITHUB_VERSION_CACHE_SECONDS (an hour by
+  // default), so checking more often than this would just re-read its cache.
+  const VERSION_CHECK_INTERVAL_MS = 15 * 60 * 1000;
+  let lastVersionCheck = Date.now();
+
+  // Only the version fields of settings.php: loadSettings() also applies ui_prefs,
+  // which mid-session would undo layout changes made in this tab since startup.
+  async function refreshVersionInfo() {
+    lastVersionCheck = Date.now();
+    const data = await get('settings.php');
+    const prefs = data.ui_prefs || {};
+    state.appVersion = data.app_version;
+    state.latestVersion = data.latest_version;
+    state.updateNotes = data.update_notes || null;
+    state.dismissedUpdateVersion = typeof prefs.dismissed_update_version === 'string' ? prefs.dismissed_update_version : null;
+    renderAppFooter();
+  }
+
   async function pollForUpdates() {
     if (document.hidden) return;
     if (!document.getElementById('settings-overlay').hidden) return;
@@ -304,6 +323,9 @@
       // that just got marked read) doesn't silently vanish out from under
       // you when the currently-viewed list happens to be "Unread".
       await loadFeeds();
+      if (Date.now() - lastVersionCheck >= VERSION_CHECK_INTERVAL_MS) {
+        await refreshVersionInfo();
+      }
     } catch (e) {
       // Silent — a background poll failing shouldn't interrupt the user with a toast.
     }
@@ -685,6 +707,32 @@
   }
 
   // Settings has the release notes, the GitHub link and the package download.
+  // Asks the server to go to GitHub right now, bypassing its hourly cache (and
+  // raw.githubusercontent.com's CDN — see GithubVersionChecker::remoteVersion).
+  document.getElementById('settings-check-update-btn').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    const originalLabel = btn.textContent;
+    btn.disabled = true;
+    btn.innerHTML = SPIN_ICON + ' Checking…';
+    try {
+      const data = await post('settings.php', { action: 'check_update' });
+      state.appVersion = data.app_version;
+      state.latestVersion = data.latest_version;
+      state.updateNotes = data.update_notes || null;
+      lastVersionCheck = Date.now();
+      renderSettingsVersion();
+      renderAppFooter();
+      if (!state.latestVersion) {
+        toast(`You're up to date (${state.appVersion})`);
+      }
+    } catch (err) {
+      toast('Could not check for updates: ' + err.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = originalLabel;
+    }
+  });
+
   document.getElementById('app-footer-update-link').addEventListener('click', (e) => {
     e.preventDefault();
     openSettings();

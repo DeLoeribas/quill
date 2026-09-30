@@ -267,7 +267,7 @@ if (!defined('GITHUB_VERSION_CACHE_FILE')) {
     define('GITHUB_VERSION_CACHE_FILE', DATA_DIR . '/github_version.json');
 }
 if (!defined('GITHUB_VERSION_CACHE_SECONDS')) {
-    define('GITHUB_VERSION_CACHE_SECONDS', 6 * 3600);
+    define('GITHUB_VERSION_CACHE_SECONDS', 3600);
 }
 if (!defined('FETCH_RETRY_ATTEMPTS')) {
     define('FETCH_RETRY_ATTEMPTS', 3);
