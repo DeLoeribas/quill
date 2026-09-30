@@ -1,4 +1,4 @@
 {
-    "version": "1.0.4",
-    "notes": "Opened articles are now searchable by their full page text. Update notices now use a version number. We can download the update."
+    "version": "1.0.5",
+    "notes": "When we have an update, the button in the footer opens the Settings instead of going to Github."
 }
