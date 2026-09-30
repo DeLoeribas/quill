@@ -41,21 +41,25 @@ The manual "Refresh all" button always force-refreshes regardless of interval.
 
 ## Deploying
 
-1. Run `bin/package-for-deploy.sh` — builds `./deploy/` from `git archive` (no local data, ever), stamps the version, and scaffolds `src/config.php`. Upload its contents; point the doc root at `public/` if possible.
+1. Run `bin/package-for-deploy.sh` — builds `./deploy/` from `git archive` (no local data, ever) and scaffolds `src/config.php`. Upload its contents; point the doc root at `public/` if possible.
 2. No custom doc root? `.htaccess` in `data/`/`src/` blocks direct access as a fallback.
 3. Optional: HTTP Basic Auth via `public/.htaccess` as defense-in-depth on top of app login.
 4. Set up scheduled refresh (above) — Option A (URL cron) works on any host.
 
 ## Updating
 
+When a higher version number is on GitHub (from `src/version.json`), the footer shows "Version X available". Click it to open Settings, or use **Check for updates** there to ask GitHub right away instead of waiting for the hourly check. To release an update, bump that number and push.
+
+**From the app (easiest):** in Settings → Version, press **Download version X**. The server builds `quill-X.zip` from the latest commit on `main`, using the same exclusions as `bin/package-for-deploy.sh`. It needs only curl, not the zip extension. The package is update-safe: it contains no `src/config.php` and nothing from `data/` except the tracked templates. Upload the contents of its `quill-X/` folder over your install. Safari unzips the download for you.
+
+**Manually:**
+
 > [!WARNING]
 > Pull/download the new version, re-run `bin/package-for-deploy.sh`, and upload it over the old install.
 >
-> On your server you can replace `public/`, `cron/`, `bin/`, and all of `src/` **except `src/config.php`** — that one file holds your login credentials and `CRON_TOKEN`, and **overwriting it with the freshly generated one wipes them**.
+> On your server you can replace `public/`, `cron/`, and all of `src/` **except `src/config.php`**. That one file holds your login credentials and `CRON_TOKEN`, and **overwriting it with the freshly generated one wipes them**.
 >
 > **Leave `data/` alone entirely.**
->
-> The footer shows a notice when a higher version number is on GitHub (from `src/version.json`) — bump that number to release an update.
 
 ## Project layout
 
