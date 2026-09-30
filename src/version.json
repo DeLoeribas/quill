@@ -1,4 +1,4 @@
 {
-    "version": "1.0.5",
-    "notes": "When we have an update, the button in the footer opens the Settings instead of going to Github."
+    "version": "1.0.6",
+    "notes": "We added text highlighting for articles, a Highlights section in the sidebar, and a highlight colour setting."
 }

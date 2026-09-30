@@ -57,6 +57,7 @@ if ($method === 'GET') {
     $unreadOnly = !empty($_GET['unread_only']);
     $starredOnly = !empty($_GET['starred_only']);
     $noteOnly = !empty($_GET['has_note']);
+    $highlightsOnly = !empty($_GET['has_highlights']);
     $limit = isset($_GET['limit']) ? max(1, (int) $_GET['limit']) : null;
     $query = trim((string) ($_GET['q'] ?? ''));
     $queryPatterns = search_query_patterns($query);
@@ -92,6 +93,9 @@ if ($method === 'GET') {
                 continue;
             }
             if ($noteOnly && empty($item['comment'])) {
+                continue;
+            }
+            if ($highlightsOnly && empty($item['highlights'])) {
                 continue;
             }
             if ($tag !== '' && !in_array($tag, $item['tags'] ?? [], true)) {
@@ -256,6 +260,67 @@ if ($method === 'POST') {
         }
 
         json_response(['ok' => true, 'tags' => $tags]);
+    }
+
+    // Replaces an item's text highlights wholesale. Each is a text-quote anchor
+    // ({id, exact, prefix, suffix, occurrenceIndex}) that the client relocates in
+    // the rendered summary, so it survives re-rendering without node paths.
+    if ($action === 'set_highlights') {
+        $feedId = $body['feed_id'] ?? null;
+        $itemId = $body['item_id'] ?? null;
+        $rawHighlights = $body['highlights'] ?? [];
+        if (!$feedId || !$itemId) {
+            json_error('feed_id and item_id are required');
+        }
+        if (!is_array($rawHighlights)) {
+            json_error('highlights must be an array');
+        }
+
+        $highlights = [];
+        foreach ($rawHighlights as $raw) {
+            if (!is_array($raw)) {
+                continue;
+            }
+            $id = (string) ($raw['id'] ?? '');
+            $exact = (string) ($raw['exact'] ?? '');
+            if ($id === '' || $exact === '') {
+                continue;
+            }
+            $highlights[] = [
+                'id' => substr($id, 0, 64),
+                'exact' => $exact,
+                'prefix' => mb_substr((string) ($raw['prefix'] ?? ''), -64),
+                'suffix' => mb_substr((string) ($raw['suffix'] ?? ''), 0, 64),
+                'occurrenceIndex' => max(0, (int) ($raw['occurrenceIndex'] ?? 0)),
+            ];
+        }
+
+        $path = items_file_path($feedId);
+        if (!is_file($path)) {
+            json_error('feed not found', 404);
+        }
+
+        $found = false;
+        Storage::update($path, ['feed_id' => $feedId, 'items' => []], function (array $data) use ($itemId, $highlights, &$found) {
+            foreach ($data['items'] as $i => $item) {
+                if ($item['id'] === $itemId) {
+                    if ($highlights === []) {
+                        unset($data['items'][$i]['highlights']);
+                    } else {
+                        $data['items'][$i]['highlights'] = $highlights;
+                    }
+                    $found = true;
+                    break;
+                }
+            }
+            return $data;
+        });
+
+        if (!$found) {
+            json_error('item not found', 404);
+        }
+
+        json_response(['ok' => true, 'highlights' => $highlights]);
     }
 
     // Fired (unawaited) by the client when an item is opened via Show page / Return:

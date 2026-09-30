@@ -345,6 +345,12 @@ function sanitize_ui_prefs(array $prefs): array
         $out['mark_read_on_nav'] = $prefs['mark_read_on_nav'];
     }
 
+    // Keep in sync with HIGHLIGHT_COLORS in app.js.
+    if (isset($prefs['highlight_color'])
+        && in_array($prefs['highlight_color'], ['yellow', 'green', 'blue', 'pink', 'orange'], true)) {
+        $out['highlight_color'] = $prefs['highlight_color'];
+    }
+
     if (isset($prefs['sidebar_collapsed']) && is_bool($prefs['sidebar_collapsed'])) {
         $out['sidebar_collapsed'] = $prefs['sidebar_collapsed'];
     }

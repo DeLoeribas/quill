@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#14161a" media="(prefers-color-scheme: dark)">
 <title>Quill</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
-<link rel="stylesheet" href="style.css?v=21">
+<link rel="stylesheet" href="style.css?v=29">
 </head>
 <body>
 <header id="app-header" hidden>
@@ -44,6 +44,11 @@
         <input type="checkbox" id="settings-mark-read-on-nav">
         Mark items read when navigating to them with j / arrow down
       </label>
+    </section>
+
+    <section class="modal-section">
+      <label id="settings-highlight-color-label">Highlight color</label>
+      <div id="settings-highlight-colors" class="highlight-color-options" role="radiogroup" aria-labelledby="settings-highlight-color-label"></div>
     </section>
 
     <section class="modal-section">
@@ -291,6 +296,7 @@
             </div>
           </div>
           <div id="reading-pane-summary" class="summary"></div>
+          <div id="reading-pane-highlights-missing" class="highlights-missing" hidden></div>
         </article>
       </section>
     </div>
@@ -313,6 +319,6 @@
   <div class="spinner" aria-hidden="true"></div>
 </div>
 
-<script src="app.js"></script>
+<script src="app.js?v=29"></script>
 </body>
 </html>

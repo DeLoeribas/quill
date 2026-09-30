@@ -34,6 +34,7 @@
     feeds: [],
     savedSearches: [],
     tags: [],
+    highlightedItems: [],
     items: [],
     filter: { type: 'all', id: null },
     selectedItemId: null,
@@ -47,6 +48,7 @@
     sortOrderUnread: 'desc',
     sortFeedsAlphabetically: false,
     markReadOnNav: false,
+    highlightColor: 'yellow',
     pane: 'items',
     paneFeed: null,
   };
@@ -245,6 +247,135 @@
     }
   }
 
+  // ---------- User text highlights ----------
+
+  // Highlights are stored as text-quote anchors ({id, exact, prefix, suffix,
+  // occurrenceIndex}) against the summary's plain text rather than DOM paths, so
+  // they relocate reliably every time the summary is re-rendered (and aren't
+  // thrown off by search-keyword marks, which don't change the text).
+
+  const HIGHLIGHT_ID_ATTR = 'data-hid';
+
+  function newHighlightId() {
+    // crypto.randomUUID() only exists in secure contexts (HTTPS/localhost).
+    if (window.crypto && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+  }
+
+  function plainTextOffset(root, node, offset) {
+    const range = document.createRange();
+    range.setStart(root, 0);
+    range.setEnd(node, offset);
+    return range.toString().length;
+  }
+
+  function pointAtOffset(root, targetOffset) {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    let consumed = 0;
+    let node;
+    while ((node = walker.nextNode())) {
+      const len = node.nodeValue.length;
+      if (consumed + len >= targetOffset) {
+        return { node, offset: targetOffset - consumed };
+      }
+      consumed += len;
+    }
+    return null;
+  }
+
+  function computeHighlightAnchor(root, range) {
+    const full = root.textContent;
+    const startOffset = plainTextOffset(root, range.startContainer, range.startOffset);
+    const endOffset = plainTextOffset(root, range.endContainer, range.endOffset);
+    const exact = full.slice(startOffset, endOffset);
+    if (!exact.trim()) return null;
+    let occurrenceIndex = 0;
+    let searchFrom = 0;
+    while (true) {
+      const idx = full.indexOf(exact, searchFrom);
+      if (idx === -1 || idx >= startOffset) break;
+      occurrenceIndex++;
+      searchFrom = idx + 1;
+    }
+    return {
+      id: newHighlightId(),
+      exact,
+      prefix: full.slice(Math.max(0, startOffset - 32), startOffset),
+      suffix: full.slice(endOffset, endOffset + 32),
+      occurrenceIndex,
+    };
+  }
+
+  function locateHighlightRange(root, anchor) {
+    const full = root.textContent;
+    let searchFrom = 0;
+    let startOffset = -1;
+    for (let i = 0; i <= anchor.occurrenceIndex; i++) {
+      startOffset = full.indexOf(anchor.exact, searchFrom);
+      if (startOffset === -1) return null;
+      searchFrom = startOffset + 1;
+    }
+    const startPoint = pointAtOffset(root, startOffset);
+    const endPoint = pointAtOffset(root, startOffset + anchor.exact.length);
+    if (!startPoint || !endPoint) return null;
+    const range = document.createRange();
+    range.setStart(startPoint.node, startPoint.offset);
+    range.setEnd(endPoint.node, endPoint.offset);
+    return range;
+  }
+
+  function makeHighlightMark(id) {
+    const mark = document.createElement('mark');
+    mark.className = 'user-highlight';
+    mark.setAttribute(HIGHLIGHT_ID_ATTR, id);
+    return mark;
+  }
+
+  // Wraps each text node the range touches in its own <mark> (all sharing one
+  // id) instead of surroundContents on the whole range, which throws as soon as
+  // the selection crosses an element boundary (paragraphs, links, …).
+  function wrapHighlightRange(root, range, id) {
+    const nodes = [];
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode: (node) => (range.intersectsNode(node) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT),
+    });
+    let n;
+    while ((n = walker.nextNode())) nodes.push(n);
+    for (const node of nodes) {
+      const s = node === range.startContainer ? range.startOffset : 0;
+      const e = node === range.endContainer ? range.endOffset : node.nodeValue.length;
+      if (s >= e) continue;
+      const nodeRange = document.createRange();
+      nodeRange.setStart(node, s);
+      nodeRange.setEnd(node, e);
+      nodeRange.surroundContents(makeHighlightMark(id));
+    }
+  }
+
+  function removeHighlightMarks(root, id) {
+    root.querySelectorAll('mark.user-highlight[' + HIGHLIGHT_ID_ATTR + '="' + CSS.escape(id) + '"]').forEach((mark) => {
+      const parent = mark.parentNode;
+      while (mark.firstChild) parent.insertBefore(mark.firstChild, mark);
+      parent.removeChild(mark);
+      parent.normalize();
+    });
+  }
+
+  // Applies every stored anchor to root; returns the ids that couldn't be found
+  // (e.g. the feed has since edited the summary text).
+  function applyUserHighlights(root, highlights) {
+    const missing = [];
+    for (const anchor of highlights || []) {
+      const range = locateHighlightRange(root, anchor);
+      if (range) {
+        wrapHighlightRange(root, range, anchor.id);
+      } else {
+        missing.push(anchor.id);
+      }
+    }
+    return missing;
+  }
+
   // ---------- Data loading ----------
 
   let feedsRequestSeq = 0;      // monotonically increasing id per loadFeeds() call
@@ -279,6 +410,8 @@
       path += '&starred_only=1';
     } else if (state.filter.type === 'note') {
       path += '&has_note=1';
+    } else if (state.filter.type === 'highlight') {
+      path += '&has_highlights=1';
     } else if (state.filter.type === 'tag') {
       path += '&tag=' + encodeURIComponent(state.filter.id);
     } else if (state.filter.type === 'search' || state.filter.type === 'saved_search') {
@@ -292,6 +425,17 @@
   async function loadTags() {
     const data = await get('tags.php');
     state.tags = data.tags || [];
+  }
+
+  // Best-effort: the sidebar section is optional, so a failure here (e.g. the
+  // endpoint not deployed yet) must not stop the app from booting.
+  async function loadHighlightedItems() {
+    try {
+      const data = await get('highlights.php');
+      state.highlightedItems = data.items || [];
+    } catch (e) {
+      state.highlightedItems = [];
+    }
   }
 
   // A tab left open for days should still learn about a new release. The server
@@ -511,6 +655,11 @@
         setFilter({ type: 'note', id: null });
         setPaneTitle('Notes', null);
       }
+    } else if (persisted.type === 'highlight') {
+      if (state.highlightedItems.length > 0) {
+        setFilter({ type: 'highlight', id: null });
+        setPaneTitle('Highlights', null);
+      }
     } else if (persisted.type === 'folder') {
       if (persisted.id === null) {
         setFilter({ type: 'folder', id: null });
@@ -593,6 +742,9 @@
     }
     if (typeof prefs.mark_read_on_nav === 'boolean') {
       state.markReadOnNav = prefs.mark_read_on_nav;
+    }
+    if (HIGHLIGHT_COLORS.includes(prefs.highlight_color)) {
+      applyHighlightColor(prefs.highlight_color);
     }
     if (Number.isInteger(prefs.sidebar_width)) {
       state.sidebarWidth = applySidebarWidth(prefs.sidebar_width);
@@ -774,6 +926,7 @@
   const COLLAPSED_KEY = 'rss_collapsed_folders';
   const UNGROUPED_KEY = '__ungrouped__';
   const TAGS_KEY = '__tags__';
+  const HIGHLIGHTS_KEY = '__highlights__';
   const SAVED_SEARCHES_KEY = '__saved_searches__';
 
   function loadCollapsedSet() {
@@ -906,6 +1059,54 @@
 
   state.markReadOnNav = loadMarkReadOnNav();
 
+  // Colour of user text highlights. The actual colours (with toned-down dark-mode
+  // variants) live in style.css, keyed off <html data-highlight-color>.
+  // Keep in sync with sanitize_ui_prefs() in src/bootstrap.php.
+  const HIGHLIGHT_COLORS = ['yellow', 'green', 'blue', 'pink', 'orange'];
+  const HIGHLIGHT_COLOR_KEY = 'rss_highlight_color';
+
+  function applyHighlightColor(color) {
+    state.highlightColor = color;
+    document.documentElement.dataset.highlightColor = color;
+    try {
+      localStorage.setItem(HIGHLIGHT_COLOR_KEY, color);
+    } catch (e) {
+      // Ignore storage errors (e.g. private browsing quota).
+    }
+  }
+
+  (function initHighlightColor() {
+    let color = 'yellow';
+    try {
+      const stored = localStorage.getItem(HIGHLIGHT_COLOR_KEY);
+      if (HIGHLIGHT_COLORS.includes(stored)) color = stored;
+    } catch (e) {
+      // Fall back to the default.
+    }
+    applyHighlightColor(color);
+  })();
+
+  function renderHighlightColorOptions() {
+    const wrap = document.getElementById('settings-highlight-colors');
+    wrap.innerHTML = '';
+    for (const color of HIGHLIGHT_COLORS) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'highlight-color-swatch';
+      btn.dataset.color = color;
+      btn.setAttribute('role', 'radio');
+      btn.setAttribute('aria-checked', String(state.highlightColor === color));
+      btn.setAttribute('aria-label', color.charAt(0).toUpperCase() + color.slice(1));
+      btn.title = btn.getAttribute('aria-label');
+      btn.addEventListener('click', () => {
+        applyHighlightColor(color);
+        saveUiPref({ highlight_color: color });
+        renderHighlightColorOptions();
+      });
+      wrap.appendChild(btn);
+    }
+  }
+
   function effectiveSortOrder() {
     return state.filter.type === 'unread' ? state.sortOrderUnread : state.sortOrder;
   }
@@ -965,6 +1166,10 @@
 
     if (state.tags.length > 0) {
       list.appendChild(tagsSectionNode());
+    }
+
+    if (state.highlightedItems.length > 0) {
+      list.appendChild(highlightsSectionNode());
     }
 
     state.folders.forEach((folder, i) => {
@@ -1158,6 +1363,76 @@
     li.appendChild(tagsWrap);
 
     return li;
+  }
+
+  // Lists every highlighted article; clicking one shows all highlighted items in
+  // the list and opens that one. The row for whichever article is open is marked
+  // active (see updateHighlightRowsActive), not the one originally clicked.
+  function highlightsSectionNode() {
+    const collapsed = state.collapsed.has(HIGHLIGHTS_KEY);
+
+    const li = document.createElement('li');
+    li.className = 'folder-node';
+
+    const row = document.createElement('div');
+    row.className = 'sidebar-row folder-row';
+    row.innerHTML = '<span class="name">Highlights</span><span class="count"></span>';
+
+    const chevron = document.createElement('button');
+    chevron.type = 'button';
+    chevron.className = 'chevron' + (collapsed ? ' collapsed' : '');
+    chevron.setAttribute('aria-label', collapsed ? 'Expand' : 'Collapse');
+    chevron.innerHTML = CHEVRON_ICON;
+    chevron.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleCollapsed(HIGHLIGHTS_KEY, chevron, highlightsWrap);
+    });
+    row.prepend(chevron);
+
+    li.appendChild(row);
+
+    const highlightsWrap = document.createElement('div');
+    highlightsWrap.className = 'folder-feeds-wrap' + (collapsed ? ' collapsed' : '');
+
+    const list = document.createElement('ul');
+    list.className = 'folder-feeds';
+    for (const h of state.highlightedItems) {
+      list.appendChild(highlightedItemRow(h));
+    }
+    highlightsWrap.appendChild(list);
+    li.appendChild(highlightsWrap);
+
+    return li;
+  }
+
+  function highlightedItemRow(h) {
+    const isActive = state.filter.type === 'highlight' && state.selectedItemId === h.id;
+    const row = document.createElement('div');
+    row.className = 'sidebar-row feed-row highlighted-item-row' + (isActive ? ' active' : '');
+    row.dataset.itemId = h.id;
+    row.innerHTML = '<span class="name"></span><span class="count count-badge"></span>';
+    row.querySelector('.name').textContent = h.title;
+    row.querySelector('.count').textContent = h.count;
+    row.title = h.title;
+    row.addEventListener('click', async () => {
+      clearSearchInput();
+      if (state.filter.type !== 'highlight') {
+        setFilter({ type: 'highlight', id: null });
+        setPaneTitle('Highlights', null);
+        renderSidebar();
+        await loadItems();
+      }
+      const index = state.items.findIndex((it) => it.id === h.id);
+      if (index !== -1) selectItem(h.id, index);
+      closeSidebar();
+    });
+    return row;
+  }
+
+  function updateHighlightRowsActive() {
+    for (const row of document.querySelectorAll('.highlighted-item-row')) {
+      row.classList.toggle('active', state.filter.type === 'highlight' && row.dataset.itemId === state.selectedItemId);
+    }
   }
 
   function sidebarRow(name, count, type, id, opts = {}) {
@@ -2054,6 +2329,7 @@
     }
     renderReadingPane(state.items[index] || null);
     persistSelectedItem(itemId);
+    updateHighlightRowsActive();
   }
 
   // Debounced so holding down j/k (or arrow keys) doesn't fire a localStorage
@@ -2244,6 +2520,7 @@
     const summaryEl = document.getElementById('reading-pane-summary');
     summaryEl.innerHTML = '';
     let summaryHasImage = false;
+    let missingHighlightIds = [];
     if (item.summary === undefined) {
       // The list response omits `summary` (often many KB of raw article HTML) to
       // keep it small; fetch the one item's full record on demand instead.
@@ -2251,12 +2528,17 @@
       ensureItemSummary(item);
     } else if (item.summary) {
       const rendered = sanitizeHtml(item.summary);
+      // User highlights first: they're anchored on plain text, which the search
+      // marks below leave unchanged either way.
+      missingHighlightIds = applyUserHighlights(rendered, item.highlights);
       highlightMatches(rendered, currentSearchQueryWords());
       summaryHasImage = !!rendered.querySelector('img');
       summaryEl.appendChild(rendered);
     } else {
       summaryEl.textContent = 'No summary available.';
+      missingHighlightIds = (item.highlights || []).map((h) => h.id);
     }
+    renderMissingHighlights(item, missingHighlightIds);
 
     // Skip the header image when the summary body already has one — avoids
     // showing the same picture twice at the top of the reading pane. Also skip it
@@ -2484,6 +2766,193 @@
   document.getElementById('reading-pane-comment-save-btn').addEventListener('click', saveReadingPaneComment);
   document.getElementById('reading-pane-comment-cancel-btn').addEventListener('click', () => {
     renderReadingPaneComment(currentReadingPaneItem);
+  });
+
+  // ---------- Reading pane: user text highlights ----------
+
+  // Selecting text in the summary shows a floating "Highlight" button; clicking
+  // a highlight removes it. Stored per item via items.php `set_highlights`.
+
+  const readingPaneSummaryEl = document.getElementById('reading-pane-summary');
+  let highlightBtn = null;
+
+  async function saveHighlights(item, previous) {
+    try {
+      await post('items.php', {
+        action: 'set_highlights',
+        feed_id: item.feed_id,
+        item_id: item.id,
+        highlights: item.highlights || [],
+      });
+      await loadHighlightedItems();
+      renderSidebar();
+    } catch (e) {
+      item.highlights = previous;
+      if (currentReadingPaneItem === item) renderReadingPane(item);
+      toast('Failed to save highlight: ' + e.message);
+    }
+  }
+
+  function renderMissingHighlights(item, missingIds) {
+    const el = document.getElementById('reading-pane-highlights-missing');
+    el.innerHTML = '';
+    el.hidden = missingIds.length === 0;
+    if (el.hidden) return;
+    const label = document.createElement('span');
+    label.textContent = missingIds.length === 1
+      ? '1 highlight no longer found in this article. '
+      : missingIds.length + ' highlights no longer found in this article. ';
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'comment-link-btn';
+    removeBtn.textContent = 'Remove';
+    removeBtn.addEventListener('click', () => {
+      const previous = item.highlights;
+      item.highlights = (item.highlights || []).filter((h) => !missingIds.includes(h.id));
+      el.hidden = true;
+      saveHighlights(item, previous);
+    });
+    el.append(label, removeBtn);
+  }
+
+  function hideHighlightButton() {
+    if (highlightBtn) {
+      highlightBtn.remove();
+      highlightBtn = null;
+    }
+  }
+
+  function showHighlightButton(range) {
+    hideHighlightButton();
+    const rect = range.getBoundingClientRect();
+    if (!rect || (rect.width === 0 && rect.height === 0)) return;
+    const item = currentReadingPaneItem;
+    const savedRange = range.cloneRange();
+    const btn = document.createElement('div');
+    btn.className = 'highlight-popover-btn';
+    btn.textContent = 'Highlight';
+    btn.dataset.forText = range.toString();
+    document.body.appendChild(btn);
+    // Touch devices put their own copy/paste callout above the selection, so
+    // go below it there instead.
+    const below = window.matchMedia('(pointer: coarse)').matches;
+    const left = rect.left + rect.width / 2 - btn.offsetWidth / 2;
+    btn.style.left = Math.max(4, Math.min(left, window.innerWidth - btn.offsetWidth - 4)) + 'px';
+    btn.style.top = (below
+      ? Math.min(rect.bottom + 8, window.innerHeight - btn.offsetHeight - 4)
+      : Math.max(4, rect.top - btn.offsetHeight - 8)) + 'px';
+    // pointerdown + preventDefault keeps the selection intact until we've read it.
+    btn.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      // Use the selection as it is *now*: the button may have appeared while
+      // the selection was still growing (e.g. after just the first word), so
+      // the range it was created for can be stale.
+      const sel = window.getSelection();
+      const liveRange = sel && !sel.isCollapsed && sel.rangeCount ? sel.getRangeAt(0) : null;
+      const range = liveRange && readingPaneSummaryEl.contains(liveRange.commonAncestorContainer)
+        ? liveRange.cloneRange()
+        : savedRange;
+      hideHighlightButton();
+      sel?.removeAllRanges();
+      if (!item || item !== currentReadingPaneItem) return;
+      const anchor = computeHighlightAnchor(readingPaneSummaryEl, range);
+      if (!anchor) return;
+      const previous = item.highlights;
+      item.highlights = [...(item.highlights || []), anchor];
+      wrapHighlightRange(readingPaneSummaryEl, range, anchor.id);
+      saveHighlights(item, previous);
+    });
+    highlightBtn = btn;
+  }
+
+  // `selectionchange` alone isn't reliable — in some browsers/extensions it
+  // never fires at all — so a finished mouse/touch/keyboard selection also
+  // triggers the check.
+  function checkSelectionForHighlight() {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed || sel.rangeCount === 0 || !currentReadingPaneItem?.summary) {
+      hideHighlightButton();
+      return;
+    }
+    const range = sel.getRangeAt(0);
+    if (!readingPaneSummaryEl.contains(range.commonAncestorContainer) || !range.toString().trim()) {
+      hideHighlightButton();
+      return;
+    }
+    showHighlightButton(range);
+  }
+
+  let highlightSelectionTimer = null;
+  function scheduleHighlightSelectionCheck() {
+    clearTimeout(highlightSelectionTimer);
+    highlightSelectionTimer = setTimeout(checkSelectionForHighlight, 150);
+  }
+  document.addEventListener('selectionchange', scheduleHighlightSelectionCheck);
+  document.addEventListener('pointerup', scheduleHighlightSelectionCheck);
+  document.addEventListener('keyup', (e) => {
+    if (e.shiftKey || e.key === 'Shift') scheduleHighlightSelectionCheck();
+  });
+
+  // Some extensions (e.g. StopTheMadness's text-selection protection) swallow
+  // pointerup/mouseup/selectionchange entirely, leaving only pointerdown. So a
+  // press inside the summary also starts briefly polling the selection: the
+  // button appears once it has stopped changing (i.e. the drag is done).
+  let highlightPollTimer = null;
+  function pollSelectionForHighlight() {
+    clearInterval(highlightPollTimer);
+    let lastText = null;
+    let ticks = 0;
+    highlightPollTimer = setInterval(() => {
+      ticks++;
+      const text = window.getSelection()?.toString() || '';
+      // Once the selection has stopped changing, (re)show the button for it —
+      // also when it has grown since the button first appeared.
+      if (text && text === lastText && (!highlightBtn || highlightBtn.dataset.forText !== text)) {
+        checkSelectionForHighlight();
+      }
+      lastText = text;
+      if (ticks > 60) clearInterval(highlightPollTimer);
+    }, 150);
+  }
+  readingPaneSummaryEl.addEventListener('pointerdown', pollSelectionForHighlight);
+
+  document.addEventListener('pointerdown', (e) => {
+    if (highlightBtn && e.target !== highlightBtn) hideHighlightButton();
+  }, true);
+  document.getElementById('reading-pane').addEventListener('scroll', hideHighlightButton, { passive: true });
+  window.addEventListener('scroll', hideHighlightButton, { passive: true });
+
+  // Clicking a highlight removes it (all its marks — one highlight spanning a
+  // link or several paragraphs is split over several <mark>s sharing an id).
+  // Capture phase + preventDefault so a link underneath isn't opened as well.
+  function removeClickedHighlight(mark) {
+    // Don't treat the end of a drag-select that started on a highlight as a click.
+    const sel = window.getSelection();
+    if (sel && !sel.isCollapsed) return;
+    const item = currentReadingPaneItem;
+    if (!item || !mark.isConnected) return;
+    const id = mark.getAttribute(HIGHLIGHT_ID_ATTR);
+    removeHighlightMarks(readingPaneSummaryEl, id);
+    const previous = item.highlights;
+    item.highlights = (item.highlights || []).filter((h) => h.id !== id);
+    saveHighlights(item, previous);
+  }
+
+  readingPaneSummaryEl.addEventListener('click', (e) => {
+    const mark = e.target.closest && e.target.closest('mark.user-highlight');
+    if (!mark) return;
+    e.preventDefault();
+    removeClickedHighlight(mark);
+  }, true);
+
+  // Fallback for when `click` is swallowed (see pollSelectionForHighlight): a
+  // press on a highlight that hasn't turned into a text selection shortly after
+  // removes it. If `click` did arrive, the mark is already gone and this no-ops.
+  readingPaneSummaryEl.addEventListener('pointerdown', (e) => {
+    const mark = e.target.closest && e.target.closest('mark.user-highlight');
+    if (!mark || e.button !== 0) return;
+    setTimeout(() => removeClickedHighlight(mark), 350);
   });
 
   // On phone-width screens the item list and reading pane share one column
@@ -3098,6 +3567,7 @@
     closeSidebar();
     document.getElementById('settings-sort-feeds-alpha').checked = state.sortFeedsAlphabetically;
     document.getElementById('settings-mark-read-on-nav').checked = state.markReadOnNav;
+    renderHighlightColorOptions();
     renderSettingsVersion();
     document.getElementById('settings-overlay').hidden = false;
   }
@@ -3558,6 +4028,7 @@
     await loadSettings();
     await loadFeeds();
     await loadTags();
+    await loadHighlightedItems();
     restorePersistedFilter();
     renderSidebar();
     updateSortOrderButton();

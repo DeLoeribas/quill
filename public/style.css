@@ -1898,3 +1898,82 @@ kbd {
     padding-top: 16px;
   }
 }
+
+/* User text highlights in the reading pane (select text → Highlight; click to remove). */
+/* Colour picked in Settings via <html data-highlight-color>; yellow is the default. */
+:root {
+  --user-highlight: #ffe066;
+}
+:root[data-highlight-color="green"] { --user-highlight: #b9f0a8; }
+:root[data-highlight-color="blue"] { --user-highlight: #b3dcff; }
+:root[data-highlight-color="pink"] { --user-highlight: #ffc2e2; }
+:root[data-highlight-color="orange"] { --user-highlight: #ffcf99; }
+
+@media (prefers-color-scheme: dark) {
+  :root { --user-highlight: rgba(250, 204, 21, 0.4); }
+  :root[data-highlight-color="green"] { --user-highlight: rgba(74, 222, 128, 0.35); }
+  :root[data-highlight-color="blue"] { --user-highlight: rgba(96, 165, 250, 0.4); }
+  :root[data-highlight-color="pink"] { --user-highlight: rgba(244, 114, 182, 0.4); }
+  :root[data-highlight-color="orange"] { --user-highlight: rgba(251, 146, 60, 0.4); }
+}
+
+mark.user-highlight {
+  background: var(--user-highlight);
+  color: inherit;
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.highlight-color-options {
+  display: flex;
+  gap: 10px;
+}
+
+.highlight-color-swatch {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--fg) 20%, transparent);
+  cursor: pointer;
+}
+.highlight-color-swatch[data-color="yellow"] { background: #ffe066; }
+.highlight-color-swatch[data-color="green"] { background: #b9f0a8; }
+.highlight-color-swatch[data-color="blue"] { background: #b3dcff; }
+.highlight-color-swatch[data-color="pink"] { background: #ffc2e2; }
+.highlight-color-swatch[data-color="orange"] { background: #ffcf99; }
+
+/* Dim the unselected swatches rather than outlining the chosen one. */
+.highlight-color-swatch[aria-checked="false"] {
+  opacity: 0.35;
+}
+.highlight-color-swatch[aria-checked="false"]:hover {
+  opacity: 0.7;
+}
+
+.highlight-popover-btn {
+  position: fixed;
+  z-index: 2147483647;
+  background: #222;
+  color: #fff;
+  font: 12px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  .highlight-popover-btn {
+    background: #f3f4f6;
+    color: #111;
+  }
+}
+
+.highlights-missing {
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
