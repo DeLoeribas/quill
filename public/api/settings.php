@@ -22,6 +22,21 @@ if ($method === 'GET') {
     ]);
 }
 
+// The manual "Check for updates" in Settings. A POST rather than GET ?check=1 because
+// an edge cache that ignores query strings could answer that from a cached GET.
+if ($method === 'POST') {
+    $body = read_json_body();
+    if (($body['action'] ?? null) !== 'check_update') {
+        json_error('unknown action');
+    }
+    $version = GithubVersionChecker::status(true);
+    json_response([
+        'app_version' => $version['version'],
+        'latest_version' => $version['latest'],
+        'update_notes' => $version['notes'],
+    ]);
+}
+
 if ($method === 'PATCH') {
     $body = read_json_body();
     $hasUiPrefs = array_key_exists('ui_prefs', $body);
