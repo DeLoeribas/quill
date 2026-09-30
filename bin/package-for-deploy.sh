@@ -23,6 +23,8 @@ rm -rf "$out"
 mkdir -p "$out"
 # ':!bin' excludes this dev-tooling directory itself, ':!README.md' the dev docs, and
 # ':!site' the marketing landing page — none of it is needed on the app server.
+# The in-app "Download version X" (src/UpdatePackager.php) applies the same exclusions;
+# keep the two lists in sync.
 git archive HEAD -- . ':!bin' ':!README.md' ':!site' | tar -x -C "$out"
 
 # config.php itself is gitignored (never committed), so git archive never produces one —

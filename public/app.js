@@ -612,7 +612,7 @@
     if (latest && latest !== state.dismissedUpdateVersion) {
       const link = document.getElementById('app-footer-update-link');
       link.textContent = `Version ${latest} available`;
-      link.title = state.updateNotes || 'See what changed on GitHub';
+      link.title = state.updateNotes || 'Open Settings to download the update';
       badge.hidden = false;
     } else {
       badge.hidden = true;
@@ -636,7 +636,59 @@
     link.rel = 'noopener';
     link.textContent = 'What changed';
     el.appendChild(link);
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'settings-update-download-btn';
+    btn.textContent = `Download version ${state.latestVersion}`;
+    btn.addEventListener('click', () => downloadUpdatePackage(btn));
+    el.append(document.createElement('br'), btn);
   }
+
+  // The server builds the package from GitHub's archive of main (see
+  // src/UpdatePackager.php), which takes a few seconds, so this goes through fetch
+  // with a spinner rather than a plain navigation, and errors can come back as a toast
+  // instead of a downloaded JSON file. POST for the same edge-cache reason as backup.
+  async function downloadUpdatePackage(btn) {
+    const originalLabel = btn.textContent;
+    btn.disabled = true;
+    btn.innerHTML = SPIN_ICON + ' Building package…';
+    try {
+      const res = await fetch(API + 'update-package.php', { method: 'POST', cache: 'no-store' });
+      if (!res.ok || !(res.headers.get('Content-Type') || '').includes('zip')) {
+        let message = `Request failed (${res.status})`;
+        try {
+          message = (await res.json()).error || message;
+        } catch (e) {}
+        if (res.status === 401) {
+          showLoginScreen(true);
+        }
+        throw new Error(message);
+      }
+      const disposition = res.headers.get('Content-Disposition') || '';
+      const filename = (disposition.match(/filename="([^"]+)"/) || [])[1] || 'quill-update.zip';
+      const url = URL.createObjectURL(await res.blob());
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      toast(`Downloaded ${filename}. Upload its contents over your install; your config and data aren't included, so they won't be overwritten.`);
+    } catch (err) {
+      toast('Could not build the update package: ' + err.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = originalLabel;
+    }
+  }
+
+  // Settings has the release notes, the GitHub link and the package download.
+  document.getElementById('app-footer-update-link').addEventListener('click', (e) => {
+    e.preventDefault();
+    openSettings();
+  });
 
   document.getElementById('app-footer-update-dismiss').addEventListener('click', () => {
     state.dismissedUpdateVersion = state.latestVersion;

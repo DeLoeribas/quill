@@ -1,4 +1,4 @@
 {
-    "version": "1.0.0",
-    "notes": "Opened articles are now searchable by their full page text. Update notices now use a version number."
+    "version": "1.0.2",
+    "notes": "Opened articles are now searchable by their full page text. Update notices now use a version number. We can download the update."
 }

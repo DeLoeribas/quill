@@ -14,6 +14,7 @@ A minimal, self-hosted RSS/Atom/JSON feed reader for one person. Plain PHP (no f
 - Favicons and item thumbnails resolved automatically, no third-party services
 - Visible items (and their images) are prefetched in the background, so opening one is instant
 - OPML import/export and full backup/restore (zip/gzip/JSON)
+- Update notice when a newer version is on GitHub, with a one-click download of an upload-ready package that leaves your config and data alone
 - Single-user login (bcrypt password, PHP session) — no database, no third-party auth
 
 See the in-app Settings panel and feed row menus for the full interaction surface, or [DOCUMENTATION.md](DOCUMENTATION.md) for the complete reference.
@@ -60,7 +61,7 @@ The manual "Refresh all" button always force-refreshes regardless of interval.
 
 ```
 public/          document root: index.html, style.css, app.js, api/*.php, cron.php
-src/             PHP classes: Storage, Auth, FeedFetcher, FaviconResolver, FeedDiscovery, RefreshService, OpmlImporter, YouTubeResolver
+src/             PHP classes: Storage, Auth, FeedFetcher, FaviconResolver, FeedDiscovery, RefreshService, OpmlImporter, YouTubeResolver, UpdatePackager
 data/            feeds.json, auth.json, items/<feed_id>.json, cron.log
 cron/refresh.php CLI scheduled-refresh entry point (see also public/cron.php)
 ```

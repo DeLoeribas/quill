@@ -148,6 +148,10 @@ body {
   font-size: 13px;
 }
 
+.settings-update-download-btn {
+  margin-top: 8px;
+}
+
 #app-header h1 {
   display: flex;
   align-items: center;
