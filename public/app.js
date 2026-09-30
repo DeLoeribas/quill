@@ -73,7 +73,9 @@
       if (res.status === 401 && path !== 'auth.php') {
         showLoginScreen(true);
       }
-      throw new Error((data && data.error) || `Request failed (${res.status})`);
+      const err = new Error((data && data.error) || `Request failed (${res.status})`);
+      err.status = res.status;
+      throw err;
     }
     if (parseFailed) {
       throw new Error(`Server returned an invalid response (status ${res.status}). This usually means a PHP error occurred on the server — check the terminal running "php -S" for the actual error.`);
@@ -2661,16 +2663,48 @@
 
   function showFeedCandidates(candidates, folderId) {
     const row = document.getElementById('add-feed-candidates-row');
-    const select = document.getElementById('add-feed-candidates');
-    select.innerHTML = '';
-    for (const c of candidates) {
-      const opt = document.createElement('option');
-      opt.value = c.url;
-      opt.textContent = c.title;
-      select.appendChild(opt);
-    }
+    const list = document.getElementById('add-feed-candidates');
+    list.innerHTML = '';
+    // Only the first (the site's main feed) starts checked; a news site can list
+    // dozens of section feeds and subscribing to all of them is rarely what you want.
+    candidates.forEach((c, i) => {
+      const label = document.createElement('label');
+      label.className = 'candidate-item';
+      const box = document.createElement('input');
+      box.type = 'checkbox';
+      box.value = c.url;
+      box.checked = i === 0;
+      const text = document.createElement('span');
+      const title = document.createElement('span');
+      title.className = 'candidate-title';
+      title.textContent = c.title;
+      const url = document.createElement('small');
+      url.className = 'candidate-url';
+      url.textContent = c.url;
+      text.append(title, url);
+      label.append(box, text);
+      list.appendChild(label);
+    });
+    document.getElementById('add-feed-candidates-count').textContent =
+      candidates.length === 1 ? '1 feed found' : `${candidates.length} feeds found`;
+    document.getElementById('add-feed-candidates-toggle-all').hidden = candidates.length < 2;
+    updateCandidateControls();
     row.hidden = false;
     row.dataset.folderId = folderId || '';
+  }
+
+  function candidateBoxes() {
+    return [...document.querySelectorAll('#add-feed-candidates input[type="checkbox"]')];
+  }
+
+  function updateCandidateControls() {
+    const boxes = candidateBoxes();
+    const checked = boxes.filter((b) => b.checked).length;
+    document.getElementById('add-feed-candidates-toggle-all').textContent =
+      checked === boxes.length ? 'Select none' : 'Select all';
+    const btn = document.getElementById('add-feed-candidates-confirm-btn');
+    btn.disabled = checked === 0;
+    btn.textContent = checked > 1 ? `Add ${checked} feeds` : 'Add selected';
   }
 
   function hideFeedCandidates() {
@@ -2715,19 +2749,55 @@
     }
   });
 
+  document.getElementById('add-feed-candidates').addEventListener('change', updateCandidateControls);
+
+  document.getElementById('add-feed-candidates-toggle-all').addEventListener('click', () => {
+    const boxes = candidateBoxes();
+    const selectAll = boxes.some((b) => !b.checked);
+    boxes.forEach((b) => { b.checked = selectAll; });
+    updateCandidateControls();
+  });
+
   document.getElementById('add-feed-candidates-confirm-btn').addEventListener('click', async (e) => {
     const row = document.getElementById('add-feed-candidates-row');
-    const select = document.getElementById('add-feed-candidates');
+    const urls = candidateBoxes().filter((b) => b.checked).map((b) => b.value);
+    if (!urls.length) return;
+    const folderId = row.dataset.folderId || null;
     const btn = e.currentTarget;
     btn.disabled = true;
-    const originalLabel = btn.textContent;
-    btn.innerHTML = SPIN_ICON + ' Adding…';
+    let added = 0;
+    let existing = 0;
+    const failures = [];
     try {
-      await submitAddFeed(select.value, row.dataset.folderId || null);
+      // One at a time rather than in parallel: each add rewrites feeds.json under a
+      // lock and refreshes the new feed, so parallel requests would just queue anyway.
+      for (const url of urls) {
+        btn.innerHTML = SPIN_ICON + ` Adding ${added + existing + failures.length + 1}/${urls.length}…`;
+        try {
+          await post('feeds.php', { url, folder_id: folderId });
+          added++;
+        } catch (err) {
+          if (err.status === 409) {
+            existing++;
+          } else {
+            failures.push(err.message);
+          }
+        }
+      }
     } finally {
       btn.disabled = false;
-      btn.textContent = originalLabel;
+      updateCandidateControls();
     }
+
+    if (added) {
+      document.getElementById('add-feed-url').value = '';
+      closeAddFeed();
+      await loadFeeds();
+    }
+    const parts = [added === 1 ? 'Added 1 feed' : `Added ${added} feeds`];
+    if (existing) parts.push(`${existing} already subscribed`);
+    if (failures.length) parts.push(`${failures.length} failed: ${failures[0]}`);
+    toast(parts.join(', '));
   });
 
   document.getElementById('settings-opml-input').addEventListener('change', async (e) => {

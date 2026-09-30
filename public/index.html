@@ -176,9 +176,15 @@
           <button type="submit">Add</button>
         </div>
       </form>
-      <div class="modal-row" id="add-feed-candidates-row" hidden>
-        <select id="add-feed-candidates"></select>
-        <button type="button" id="add-feed-candidates-confirm-btn">Use this feed</button>
+      <div id="add-feed-candidates-row" hidden>
+        <div class="candidate-list-header">
+          <span id="add-feed-candidates-count"></span>
+          <button type="button" class="link-btn" id="add-feed-candidates-toggle-all">Select all</button>
+        </div>
+        <div id="add-feed-candidates" class="candidate-list"></div>
+        <div class="modal-row">
+          <button type="button" id="add-feed-candidates-confirm-btn">Add selected</button>
+        </div>
       </div>
     </section>
   </div>

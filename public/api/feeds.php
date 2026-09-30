@@ -94,7 +94,11 @@ if ($method === 'POST') {
         json_error('This page returned HTTP ' . $probe->httpCode . $hint);
     }
     if (FeedFetcher::parse($probe->body) === null) {
-        $candidates = FeedDiscovery::discover(substr($probe->body, 0, 262144), $url);
+        $html = substr($probe->body, 0, 262144);
+        $candidates = FeedDiscovery::discover($html, $url);
+        if ($candidates === []) {
+            $candidates = FeedDiscovery::discoverFromAnchors($html, $url, FETCH_CONCURRENCY);
+        }
         if ($candidates === []) {
             $candidates = FeedDiscovery::probeWellKnownPaths($url, FETCH_CONCURRENCY);
         }
