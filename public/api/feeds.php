@@ -28,7 +28,6 @@ if ($method === 'GET') {
         $feed['unread_count'] = unread_count_for($feed['id']);
         $feed['item_count'] = item_count_for($feed['id']);
         $feed['starred_count'] = starred_count_for($feed['id']);
-        $feed['note_count'] = note_count_for($feed['id']);
         return $feed;
     }, $data['feeds']);
     $savedSearches = array_map(function ($ss) use ($feeds) {
@@ -157,7 +156,6 @@ if ($method === 'POST') {
             $feed['unread_count'] = unread_count_for($feedId);
             $feed['item_count'] = item_count_for($feedId);
             $feed['starred_count'] = starred_count_for($feedId);
-            $feed['note_count'] = note_count_for($feedId);
             break;
         }
     }
@@ -213,7 +211,6 @@ if ($method === 'PATCH') {
     $feed['unread_count'] = unread_count_for($id);
     $feed['item_count'] = item_count_for($id);
     $feed['starred_count'] = starred_count_for($id);
-    $feed['note_count'] = note_count_for($id);
     json_response(['feed' => $feed]);
 }
 

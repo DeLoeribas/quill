@@ -1,4 +1,4 @@
 {
-    "version": "1.0.6",
-    "notes": "We added text highlighting for articles, a Highlights section in the sidebar, and a highlight colour setting."
+    "version": "1.0.7",
+    "notes": "Notes have now a yellow background and are ordered in the Notes group.<br>Feed group titles are now in blue, to distinguish them from TAGS, HIGHLIGHTS etc."
 }

@@ -16,7 +16,6 @@
   const BOOKMARK_FILLED_ICON = '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21 12 16l-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>';
   const ALL_ITEMS_ICON = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/></svg>';
   const UNREAD_ICON = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"/></svg>';
-  const NOTE_ICON = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16v16H4z"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="12" y2="17"/></svg>';
   // chevron.right shape; rotated -90deg via .chevron.collapsed in CSS to read as chevron.down when expanded
   const CHEVRON_ICON = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>';
   const REFRESH_INTERVAL_PRESETS = [15, 30, 60, 120, 240, 360, 720, 1440];
@@ -35,6 +34,7 @@
     savedSearches: [],
     tags: [],
     highlightedItems: [],
+    notedItems: [],
     items: [],
     filter: { type: 'all', id: null },
     selectedItemId: null,
@@ -438,6 +438,16 @@
     }
   }
 
+  // Best-effort, same as loadHighlightedItems().
+  async function loadNotedItems() {
+    try {
+      const data = await get('notes.php');
+      state.notedItems = data.items || [];
+    } catch (e) {
+      state.notedItems = [];
+    }
+  }
+
   // A tab left open for days should still learn about a new release. The server
   // itself only asks GitHub once per GITHUB_VERSION_CACHE_SECONDS (an hour by
   // default), so checking more often than this would just re-read its cache.
@@ -483,9 +493,6 @@
     return state.feeds.reduce((sum, f) => sum + (f.item_count || 0), 0);
   }
 
-  function totalNotes() {
-    return state.feeds.reduce((sum, f) => sum + (f.note_count || 0), 0);
-  }
 
   function totalStarred() {
     return state.feeds.reduce((sum, f) => sum + (f.starred_count || 0), 0);
@@ -651,7 +658,7 @@
         setPaneTitle('Saved', null);
       }
     } else if (persisted.type === 'note') {
-      if (totalNotes() > 0) {
+      if (state.notedItems.length > 0) {
         setFilter({ type: 'note', id: null });
         setPaneTitle('Notes', null);
       }
@@ -927,6 +934,7 @@
   const UNGROUPED_KEY = '__ungrouped__';
   const TAGS_KEY = '__tags__';
   const HIGHLIGHTS_KEY = '__highlights__';
+  const NOTES_KEY = '__notes__';
   const SAVED_SEARCHES_KEY = '__saved_searches__';
 
   function loadCollapsedSet() {
@@ -1155,11 +1163,6 @@
       list.appendChild(sidebarRow('Saved', starred, 'starred', null, { badge: true, icon: BOOKMARK_FILLED_ICON }));
     }
 
-    const notes = totalNotes();
-    if (notes > 0) {
-      list.appendChild(sidebarRow('Notes', notes, 'note', null, { badge: true, icon: NOTE_ICON }));
-    }
-
     if (state.savedSearches.length > 0) {
       list.appendChild(savedSearchesSectionNode());
     }
@@ -1170,6 +1173,10 @@
 
     if (state.highlightedItems.length > 0) {
       list.appendChild(highlightsSectionNode());
+    }
+
+    if (state.notedItems.length > 0) {
+      list.appendChild(notesSectionNode());
     }
 
     state.folders.forEach((folder, i) => {
@@ -1200,6 +1207,7 @@
     li.className = 'folder-node';
 
     const row = sidebarRow(name, count, 'folder', folderId, { folderRow: true });
+    row.classList.add('feed-folder-row');
 
     const chevron = document.createElement('button');
     chevron.type = 'button';
@@ -1433,6 +1441,71 @@
     for (const row of document.querySelectorAll('.highlighted-item-row')) {
       row.classList.toggle('active', state.filter.type === 'highlight' && row.dataset.itemId === state.selectedItemId);
     }
+    for (const row of document.querySelectorAll('.noted-item-row')) {
+      row.classList.toggle('active', state.filter.type === 'note' && row.dataset.itemId === state.selectedItemId);
+    }
+  }
+
+  // Same shape as the Highlights section: one row per article with a note;
+  // clicking one shows all noted items in the list and opens that one.
+  function notesSectionNode() {
+    const collapsed = state.collapsed.has(NOTES_KEY);
+
+    const li = document.createElement('li');
+    li.className = 'folder-node';
+
+    const row = document.createElement('div');
+    row.className = 'sidebar-row folder-row';
+    row.innerHTML = '<span class="name">Notes</span><span class="count"></span>';
+
+    const chevron = document.createElement('button');
+    chevron.type = 'button';
+    chevron.className = 'chevron' + (collapsed ? ' collapsed' : '');
+    chevron.setAttribute('aria-label', collapsed ? 'Expand' : 'Collapse');
+    chevron.innerHTML = CHEVRON_ICON;
+    chevron.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleCollapsed(NOTES_KEY, chevron, notesWrap);
+    });
+    row.prepend(chevron);
+
+    li.appendChild(row);
+
+    const notesWrap = document.createElement('div');
+    notesWrap.className = 'folder-feeds-wrap' + (collapsed ? ' collapsed' : '');
+
+    const list = document.createElement('ul');
+    list.className = 'folder-feeds';
+    for (const n of state.notedItems) {
+      list.appendChild(notedItemRow(n));
+    }
+    notesWrap.appendChild(list);
+    li.appendChild(notesWrap);
+
+    return li;
+  }
+
+  function notedItemRow(n) {
+    const isActive = state.filter.type === 'note' && state.selectedItemId === n.id;
+    const row = document.createElement('div');
+    row.className = 'sidebar-row feed-row noted-item-row' + (isActive ? ' active' : '');
+    row.dataset.itemId = n.id;
+    row.innerHTML = '<span class="name"></span>';
+    row.querySelector('.name').textContent = n.title;
+    row.title = n.title + '\n\n' + n.comment;
+    row.addEventListener('click', async () => {
+      clearSearchInput();
+      if (state.filter.type !== 'note') {
+        setFilter({ type: 'note', id: null });
+        setPaneTitle('Notes', null);
+        renderSidebar();
+        await loadItems();
+      }
+      const index = state.items.findIndex((it) => it.id === n.id);
+      if (index !== -1) selectItem(n.id, index);
+      closeSidebar();
+    });
+    return row;
   }
 
   function sidebarRow(name, count, type, id, opts = {}) {
@@ -2718,19 +2791,12 @@
     const item = currentReadingPaneItem;
     if (!item) return;
     const comment = document.getElementById('reading-pane-comment-input').value.trim();
-    const hadComment = !!item.comment;
-    const willHaveComment = !!comment;
     try {
       await post('items.php', { action: 'set_comment', feed_id: item.feed_id, item_id: item.id, comment });
       item.comment = comment || null;
       renderReadingPaneComment(item);
-      if (hadComment !== willHaveComment) {
-        const feed = state.feeds.find((f) => f.id === item.feed_id);
-        if (feed) {
-          feed.note_count = Math.max(0, (feed.note_count || 0) + (willHaveComment ? 1 : -1));
-        }
-        renderSidebar();
-      }
+      await loadNotedItems();
+      renderSidebar();
     } catch (e) {
       toast('Failed to save note: ' + e.message);
     }
@@ -2742,19 +2808,15 @@
     const previous = item.comment;
     item.comment = null;
     renderReadingPaneComment(item);
-    const feed = state.feeds.find((f) => f.id === item.feed_id);
-    if (feed) {
-      feed.note_count = Math.max(0, (feed.note_count || 0) - 1);
-    }
+    const previousNoted = state.notedItems;
+    state.notedItems = state.notedItems.filter((n) => n.id !== item.id);
     renderSidebar();
     try {
       await post('items.php', { action: 'set_comment', feed_id: item.feed_id, item_id: item.id, comment: '' });
     } catch (e) {
       item.comment = previous;
       renderReadingPaneComment(item);
-      if (feed) {
-        feed.note_count = (feed.note_count || 0) + 1;
-      }
+      state.notedItems = previousNoted;
       renderSidebar();
       toast('Failed to delete note: ' + e.message);
     }
@@ -4029,6 +4091,7 @@
     await loadFeeds();
     await loadTags();
     await loadHighlightedItems();
+    await loadNotedItems();
     restorePersistedFilter();
     renderSidebar();
     updateSortOrderButton();
