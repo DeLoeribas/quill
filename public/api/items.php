@@ -59,6 +59,7 @@ if ($method === 'GET') {
     $noteOnly = !empty($_GET['has_note']);
     $highlightsOnly = !empty($_GET['has_highlights']);
     $limit = isset($_GET['limit']) ? max(1, (int) $_GET['limit']) : null;
+    $offset = max(0, (int) ($_GET['offset'] ?? 0));
     $query = trim((string) ($_GET['q'] ?? ''));
     $queryPatterns = search_query_patterns($query);
     $tag = strtolower(trim((string) ($_GET['tag'] ?? '')));
@@ -116,11 +117,16 @@ if ($method === 'GET') {
         ? strcmp((string) $a['published'], (string) $b['published'])
         : strcmp((string) $b['published'], (string) $a['published']));
 
-    if ($limit !== null) {
-        $items = array_slice($items, 0, $limit);
+    $total = count($items);
+    if ($limit !== null || $offset > 0) {
+        $items = array_slice($items, $offset, $limit);
     }
 
-    json_response(['items' => $items]);
+    json_response([
+        'items' => $items,
+        'total' => $total,
+        'has_more' => $offset + count($items) < $total,
+    ]);
 }
 
 if ($method === 'POST') {

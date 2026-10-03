@@ -1,4 +1,4 @@
 {
-    "version": "1.0.7",
-    "notes": "Notes have now a yellow background and are ordered in the Notes group.<br>Feed group titles are now in blue, to distinguish them from TAGS, HIGHLIGHTS etc."
+    "version": "1.0.8",
+    "notes": "Item lists are no longer capped at 200 items: older items now load automatically as you scroll down (or move down with the keyboard)."
 }

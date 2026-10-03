@@ -398,8 +398,15 @@
     }
   }
 
-  async function loadItems() {
-    let path = 'items.php?limit=200&order=' + effectiveSortOrder();
+  // Lists are fetched a page at a time: views can hold thousands of items, and
+  // building every row up front would be slow. loadMoreItems() appends the next
+  // page as the list scrolls (or keyboard selection) nears the end.
+  const ITEMS_PAGE_SIZE = 200;
+  let itemsRequestSeq = 0;   // bumped per loadItems() so a stale page is dropped
+  let itemsLoadingMore = false;
+
+  function itemsQueryPath(offset) {
+    let path = 'items.php?limit=' + ITEMS_PAGE_SIZE + '&offset=' + offset + '&order=' + effectiveSortOrder();
     if (state.filter.type === 'feed') {
       path += '&feed_id=' + encodeURIComponent(state.filter.id);
     } else if (state.filter.type === 'folder') {
@@ -417,9 +424,41 @@
     } else if (state.filter.type === 'search' || state.filter.type === 'saved_search') {
       path += '&q=' + encodeURIComponent(state.filter.query || '');
     }
-    const data = await get(path);
+    return path;
+  }
+
+  async function loadItems() {
+    const seq = ++itemsRequestSeq;
+    const data = await get(itemsQueryPath(0));
+    if (seq !== itemsRequestSeq) return; // a newer loadItems() superseded this one
+    itemsLoadingMore = false;
     state.items = data.items;
+    state.itemsHasMore = !!data.has_more;
     renderItems();
+  }
+
+  async function loadMoreItems() {
+    if (itemsLoadingMore || !state.itemsHasMore) return;
+    itemsLoadingMore = true;
+    const seq = itemsRequestSeq;
+    let data;
+    try {
+      data = await get(itemsQueryPath(state.items.length));
+    } finally {
+      if (seq === itemsRequestSeq) itemsLoadingMore = false;
+    }
+    if (seq !== itemsRequestSeq) return; // view changed while this page loaded
+    const list = document.getElementById('item-list');
+    const sentinel = document.getElementById('item-list-sentinel');
+    const start = state.items.length;
+    data.items.forEach((item, i) => {
+      state.items.push(item);
+      const li = buildItemRow(item, start + i);
+      list.insertBefore(li, sentinel);
+      observeRowForPrefetch(li, item);
+    });
+    state.itemsHasMore = !!data.has_more;
+    if (!state.itemsHasMore && sentinel) sentinel.remove();
   }
 
   async function loadTags() {
@@ -2108,157 +2147,18 @@
     document.getElementById('item-list-empty').hidden = state.items.length !== 0;
 
     state.items.forEach((item, idx) => {
-      // Two items can legitimately share an id (e.g. the same article surfaced
-      // by two different feed subscriptions) — idx is what disambiguates which
-      // row is actually the keyboard-selected one, since ids alone can't.
-      const isSelected = idx === state.selectedIndex && item.id === state.selectedItemId;
-      const li = document.createElement('li');
-      li.className = 'item-row' + (item.read ? ' read' : '') + (item.starred ? ' starred' : '') + (isSelected ? ' selected' : '') + (state.bulkSelectedIds.has(item.id) ? ' bulk-selected' : '');
-      li.dataset.itemId = item.id;
-
-      const dot = document.createElement('span');
-      dot.className = 'dot';
-
-      const content = document.createElement('div');
-      content.className = 'content';
-
-      const title = document.createElement('p');
-      title.className = 'title';
-      title.textContent = item.title || '(untitled)';
-
-      const meta = document.createElement('div');
-      meta.className = 'meta';
-      meta.textContent = (item.feed_title || '') + (item.published ? ' · ' + formatItemTime(item.published) : '');
-
-      content.appendChild(title);
-      content.appendChild(meta);
-
-      const actionsRow = document.createElement('div');
-      actionsRow.className = 'item-actions-row';
-
-      if (item.link) {
-        const openBtn = document.createElement('button');
-        openBtn.type = 'button';
-        openBtn.className = 'show-page-btn';
-        openBtn.textContent = 'Show page';
-        openBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          openItem(item, li);
-        });
-
-        actionsRow.appendChild(openBtn);
-      }
-
-      const readToggleBtn = document.createElement('button');
-      readToggleBtn.type = 'button';
-      readToggleBtn.className = 'item-read-toggle';
-      readToggleBtn.textContent = item.read ? '○' : '✓';
-      readToggleBtn.title = item.read ? 'Mark unread' : 'Mark read';
-      readToggleBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        toggleItemRead(item, li);
-      });
-
-      const starToggleBtn = document.createElement('button');
-      starToggleBtn.type = 'button';
-      starToggleBtn.className = 'item-star-toggle';
-      starToggleBtn.innerHTML = item.starred ? BOOKMARK_FILLED_ICON : BOOKMARK_ICON;
-      starToggleBtn.title = item.starred ? 'Remove from Saved' : 'Save';
-      starToggleBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        toggleItemStar(item, li);
-      });
-
-      if (state.bulkMode) {
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.className = 'bulk-checkbox';
-        checkbox.checked = state.bulkSelectedIds.has(item.id);
-        checkbox.setAttribute('aria-label', 'Select item');
-        checkbox.addEventListener('click', (e) => {
-          e.stopPropagation();
-          toggleBulkSelected(item.id, li);
-        });
-        li.appendChild(checkbox);
-      }
-
-      // Swipe (touch only) slides `fg` aside to reveal this hint underneath —
-      // stands in for the hover-revealed .item-actions buttons, which a
-      // touch device can never hover to see. See attachItemRowSwipe().
-      const swipeHint = document.createElement('div');
-      swipeHint.className = 'item-row-swipe-hint';
-      li.appendChild(swipeHint);
-
-      const fg = document.createElement('div');
-      fg.className = 'item-row-fg';
-
-      fg.appendChild(dot);
-      const feed = state.feeds.find((f) => f.id === item.feed_id);
-      const thumbCandidates = [item.image, feed?.image_url, faviconUrlFor(feed || {})].filter(Boolean);
-      if (thumbCandidates.length) {
-        const thumb = document.createElement('img');
-        thumb.className = 'item-thumb';
-        thumb.src = thumbCandidates[0];
-        thumb.alt = '';
-        thumb.loading = 'lazy';
-        thumb.referrerPolicy = 'no-referrer';
-        let candidateIdx = 0;
-        thumb.addEventListener('error', () => {
-          candidateIdx += 1;
-          if (candidateIdx < thumbCandidates.length) {
-            thumb.src = thumbCandidates[candidateIdx];
-          } else {
-            thumb.remove();
-          }
-        });
-        fg.appendChild(thumb);
-      }
-      const itemActions = document.createElement('div');
-      itemActions.className = 'item-actions';
-      itemActions.appendChild(starToggleBtn);
-      itemActions.appendChild(readToggleBtn);
-      actionsRow.appendChild(itemActions);
-      content.appendChild(actionsRow);
-
-      fg.appendChild(content);
-      li.appendChild(fg);
-
-      // Shared with attachItemRowSwipe below: a swipe that crossed the
-      // activation threshold shouldn't also fire the tap-to-open handler
-      // once the finger lifts, even though preventDefault() during the drag
-      // already suppresses the browser's own synthetic click in most cases.
-      const swipeGuard = { justSwiped: false };
-
-      li.addEventListener('click', () => {
-        if (swipeGuard.justSwiped) {
-          swipeGuard.justSwiped = false;
-          return;
-        }
-        if (state.bulkMode) {
-          toggleBulkSelected(item.id, li);
-          return;
-        }
-        selectItem(item.id, idx);
-        markItemRead(item, li);
-        if (isMobileSidebarLayout()) {
-          openMobileReadingPane();
-        }
-      });
-      li.addEventListener('mouseenter', () => {
-        hoveredItem = { item, rowEl: li };
-      });
-      li.addEventListener('mouseleave', () => {
-        if (hoveredItem && hoveredItem.rowEl === li) {
-          hoveredItem = null;
-        }
-      });
-      if (!state.bulkMode) {
-        attachItemRowSwipe(li, fg, swipeHint, item, swipeGuard);
-      }
-
+      const li = buildItemRow(item, idx);
       list.appendChild(li);
       observeRowForPrefetch(li, item);
     });
+
+    if (state.itemsHasMore) {
+      const sentinel = document.createElement('li');
+      sentinel.id = 'item-list-sentinel';
+      sentinel.setAttribute('aria-hidden', 'true');
+      list.appendChild(sentinel);
+      if (loadMoreObserver) loadMoreObserver.observe(sentinel);
+    }
 
     // The reading pane mirrors whatever's selected, but a reload (folder switch,
     // search, refresh) can leave state.selectedIndex pointing at a stale position
@@ -2279,6 +2179,165 @@
         renderReadingPane(null);
       }
     }
+  }
+
+  // Fires loadMoreItems() once the end-of-list sentinel scrolls within reach.
+  const loadMoreObserver = 'IntersectionObserver' in window
+    ? new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) loadMoreItems();
+    }, { root: document.getElementById('item-pane'), rootMargin: '600px 0px' })
+    : null;
+
+  function buildItemRow(item, idx) {
+    // Two items can legitimately share an id (e.g. the same article surfaced
+    // by two different feed subscriptions) — idx is what disambiguates which
+    // row is actually the keyboard-selected one, since ids alone can't.
+    const isSelected = idx === state.selectedIndex && item.id === state.selectedItemId;
+    const li = document.createElement('li');
+    li.className = 'item-row' + (item.read ? ' read' : '') + (item.starred ? ' starred' : '') + (isSelected ? ' selected' : '') + (state.bulkSelectedIds.has(item.id) ? ' bulk-selected' : '');
+    li.dataset.itemId = item.id;
+
+    const dot = document.createElement('span');
+    dot.className = 'dot';
+
+    const content = document.createElement('div');
+    content.className = 'content';
+
+    const title = document.createElement('p');
+    title.className = 'title';
+    title.textContent = item.title || '(untitled)';
+
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    meta.textContent = (item.feed_title || '') + (item.published ? ' · ' + formatItemTime(item.published) : '');
+
+    content.appendChild(title);
+    content.appendChild(meta);
+
+    const actionsRow = document.createElement('div');
+    actionsRow.className = 'item-actions-row';
+
+    if (item.link) {
+      const openBtn = document.createElement('button');
+      openBtn.type = 'button';
+      openBtn.className = 'show-page-btn';
+      openBtn.textContent = 'Show page';
+      openBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        openItem(item, li);
+      });
+
+      actionsRow.appendChild(openBtn);
+    }
+
+    const readToggleBtn = document.createElement('button');
+    readToggleBtn.type = 'button';
+    readToggleBtn.className = 'item-read-toggle';
+    readToggleBtn.textContent = item.read ? '○' : '✓';
+    readToggleBtn.title = item.read ? 'Mark unread' : 'Mark read';
+    readToggleBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleItemRead(item, li);
+    });
+
+    const starToggleBtn = document.createElement('button');
+    starToggleBtn.type = 'button';
+    starToggleBtn.className = 'item-star-toggle';
+    starToggleBtn.innerHTML = item.starred ? BOOKMARK_FILLED_ICON : BOOKMARK_ICON;
+    starToggleBtn.title = item.starred ? 'Remove from Saved' : 'Save';
+    starToggleBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleItemStar(item, li);
+    });
+
+    if (state.bulkMode) {
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.className = 'bulk-checkbox';
+      checkbox.checked = state.bulkSelectedIds.has(item.id);
+      checkbox.setAttribute('aria-label', 'Select item');
+      checkbox.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleBulkSelected(item.id, li);
+      });
+      li.appendChild(checkbox);
+    }
+
+    // Swipe (touch only) slides `fg` aside to reveal this hint underneath —
+    // stands in for the hover-revealed .item-actions buttons, which a
+    // touch device can never hover to see. See attachItemRowSwipe().
+    const swipeHint = document.createElement('div');
+    swipeHint.className = 'item-row-swipe-hint';
+    li.appendChild(swipeHint);
+
+    const fg = document.createElement('div');
+    fg.className = 'item-row-fg';
+
+    fg.appendChild(dot);
+    const feed = state.feeds.find((f) => f.id === item.feed_id);
+    const thumbCandidates = [item.image, feed?.image_url, faviconUrlFor(feed || {})].filter(Boolean);
+    if (thumbCandidates.length) {
+      const thumb = document.createElement('img');
+      thumb.className = 'item-thumb';
+      thumb.src = thumbCandidates[0];
+      thumb.alt = '';
+      thumb.loading = 'lazy';
+      thumb.referrerPolicy = 'no-referrer';
+      let candidateIdx = 0;
+      thumb.addEventListener('error', () => {
+        candidateIdx += 1;
+        if (candidateIdx < thumbCandidates.length) {
+          thumb.src = thumbCandidates[candidateIdx];
+        } else {
+          thumb.remove();
+        }
+      });
+      fg.appendChild(thumb);
+    }
+    const itemActions = document.createElement('div');
+    itemActions.className = 'item-actions';
+    itemActions.appendChild(starToggleBtn);
+    itemActions.appendChild(readToggleBtn);
+    actionsRow.appendChild(itemActions);
+    content.appendChild(actionsRow);
+
+    fg.appendChild(content);
+    li.appendChild(fg);
+
+    // Shared with attachItemRowSwipe below: a swipe that crossed the
+    // activation threshold shouldn't also fire the tap-to-open handler
+    // once the finger lifts, even though preventDefault() during the drag
+    // already suppresses the browser's own synthetic click in most cases.
+    const swipeGuard = { justSwiped: false };
+
+    li.addEventListener('click', () => {
+      if (swipeGuard.justSwiped) {
+        swipeGuard.justSwiped = false;
+        return;
+      }
+      if (state.bulkMode) {
+        toggleBulkSelected(item.id, li);
+        return;
+      }
+      selectItem(item.id, idx);
+      markItemRead(item, li);
+      if (isMobileSidebarLayout()) {
+        openMobileReadingPane();
+      }
+    });
+    li.addEventListener('mouseenter', () => {
+      hoveredItem = { item, rowEl: li };
+    });
+    li.addEventListener('mouseleave', () => {
+      if (hoveredItem && hoveredItem.rowEl === li) {
+        hoveredItem = null;
+      }
+    });
+    if (!state.bulkMode) {
+      attachItemRowSwipe(li, fg, swipeHint, item, swipeGuard);
+    }
+
+    return li;
   }
 
   const SWIPE_ACTIVATE_PX = 10;
@@ -3992,6 +4051,8 @@
         const rowEl = document.querySelectorAll('#item-list li')[nextIndex];
         if (rowEl) markItemRead(state.items[nextIndex], rowEl);
       }
+      // Fetch the next page before the selection runs off the loaded end.
+      if (nextIndex >= state.items.length - 20) loadMoreItems();
       return;
     }
 
@@ -4016,6 +4077,7 @@
       if (state.items.length === 0) return;
       const index = e.key === 'Home' ? 0 : state.items.length - 1;
       selectItem(state.items[index].id, index);
+      if (e.key === 'End') loadMoreItems();
       return;
     }
 
