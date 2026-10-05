@@ -174,7 +174,7 @@ final class Users
 
         $lock = fopen(DATA_DIR . '/.migrate.lock', 'c');
         if ($lock === false) {
-            return;
+            throw new RuntimeException('could not create data/.migrate.lock — is data/ writable by the web server?');
         }
         flock($lock, LOCK_EX);
         try {
@@ -189,17 +189,30 @@ final class Users
 
             $id = 'usr_' . bin2hex(random_bytes(6));
             $dir = user_data_dir($id);
-            mkdir($dir, 0775, true);
+            if (!is_dir($dir) && !@mkdir($dir, 0775, true)) {
+                throw new RuntimeException("could not create {$dir} — is data/ writable by the web server?");
+            }
 
             $moves = [
                 defined('FEEDS_FILE') ? FEEDS_FILE : DATA_DIR . '/feeds.json' => $dir . '/feeds.json',
                 defined('ITEMS_DIR') ? ITEMS_DIR : DATA_DIR . '/items' => $dir . '/items',
                 defined('PAGES_DIR') ? PAGES_DIR : DATA_DIR . '/pages' => $dir . '/pages',
             ];
+            // All or nothing: if any move fails, put back what was moved and stop, rather than
+            // creating the admin account with its data left behind (it would look empty).
+            $moved = [];
             foreach ($moves as $from => $to) {
-                if (file_exists($from)) {
-                    rename($from, $to);
+                if (!file_exists($from)) {
+                    continue;
                 }
+                if (!@rename($from, $to)) {
+                    foreach (array_reverse($moved, true) as $back => $at) {
+                        @rename($at, $back);
+                    }
+                    @rmdir($dir);
+                    throw new RuntimeException("could not move {$from} — is data/ writable by the web server?");
+                }
+                $moved[$from] = $to;
             }
             Storage::update(USERS_FILE, ['users' => []], fn () => ['users' => [[
                 'id' => $id,

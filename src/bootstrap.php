@@ -303,7 +303,17 @@ if (!defined('USERS_FILE')) {
 }
 
 // Moves a pre-multi-user install's data into data/users/<id>/ on the first request after the update.
-Users::migrateLegacyIfNeeded();
+// If it fails, nothing has changed, and every request stops here with the reason instead of
+// carrying on without users.json (which would offer to create a brand-new login).
+try {
+    Users::migrateLegacyIfNeeded();
+} catch (RuntimeException $e) {
+    if (PHP_SAPI === 'cli') {
+        fwrite(STDERR, 'Upgrade to multiple accounts failed: ' . $e->getMessage() . "\n");
+        exit(1);
+    }
+    json_error('Upgrade to multiple accounts failed: ' . $e->getMessage(), 500);
+}
 
 function read_items_file(string $feedId): array
 {
