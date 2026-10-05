@@ -20,7 +20,7 @@ final class RefreshService
      */
     public static function refreshFeed(string $feedId, bool $force = false): array
     {
-        $feedsData = Storage::read(FEEDS_FILE, ['folders' => [], 'feeds' => []]);
+        $feedsData = Storage::read(feeds_file(), ['folders' => [], 'feeds' => []]);
         $feed = self::findFeed($feedsData, $feedId);
         if ($feed === null) {
             return ['status' => 'error', 'new_items' => 0, 'error' => 'feed not found'];
@@ -203,7 +203,7 @@ final class RefreshService
      */
     public static function refreshAll(bool $force = false): array
     {
-        $feedsData = Storage::read(FEEDS_FILE, ['folders' => [], 'feeds' => []]);
+        $feedsData = Storage::read(feeds_file(), ['folders' => [], 'feeds' => []]);
         $feeds = $feedsData['feeds'];
 
         $results = [];
@@ -257,7 +257,7 @@ final class RefreshService
 
     private static function updateFeedMeta(string $feedId, callable $mutator): void
     {
-        Storage::update(FEEDS_FILE, ['folders' => [], 'feeds' => []], function (array $data) use ($feedId, $mutator) {
+        Storage::update(feeds_file(), ['folders' => [], 'feeds' => []], function (array $data) use ($feedId, $mutator) {
             foreach ($data['feeds'] as $i => $f) {
                 if ($f['id'] === $feedId) {
                     $data['feeds'][$i] = $mutator($f);

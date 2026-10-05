@@ -16,7 +16,7 @@ A minimal, self-hosted RSS/Atom/JSON feed reader for one person. Plain PHP (no f
 - Visible items (and their images) are prefetched in the background, so opening one is instant
 - OPML import/export and full backup/restore (zip/gzip/JSON)
 - Update notice when a newer version is on GitHub, with a one-click download of an upload-ready package that leaves your config and data alone
-- Single-user login (bcrypt password, PHP session) — no database, no third-party auth
+- Multiple accounts, each with its own feeds, folders, saved items, tags, highlights and settings; the admin adds and removes them in Settings (bcrypt passwords, PHP session — no database, no third-party auth)
 
 See the in-app Settings panel and feed row menus for the full interaction surface, or [DOCUMENTATION.md](DOCUMENTATION.md) for the complete reference.
 
@@ -28,7 +28,11 @@ cp src/config.sample.php src/config.php   # if not already done
 php -S localhost:8000 -t public
 ```
 
-Open http://localhost:8000/ and create your login on first visit. Data lives under `data/` as JSON files. Lost your password? Delete `data/auth.json` to reset login only — feeds/items are untouched.
+Open http://localhost:8000/ and create your login on first visit; that first account is the admin, who can add more accounts under Settings → Users. Data lives under `data/` as JSON files, one folder per account in `data/users/<id>/`. Lost your password? An admin can reset it in Settings → Users; for the only admin, run on the server:
+
+```
+php -r 'require "src/bootstrap.php"; Users::setPassword(Users::findByUsername("YOUR_NAME")["id"], "NEW_PASSWORD");'
+```
 
 ## Scheduled refresh
 
@@ -67,8 +71,8 @@ When a higher version number is on GitHub (from `src/version.json`), the footer 
 ```
 public/          document root: index.html, style.css, app.js, api/*.php, cron.php
 src/             PHP classes: Storage, Auth, FeedFetcher, FaviconResolver, FeedDiscovery, RefreshService, OpmlImporter, YouTubeResolver, UpdatePackager
-data/            feeds.json, auth.json, items/<feed_id>.json, cron.log
+data/            users.json (accounts), users/<user_id>/{feeds.json, items/, pages/}, cron.log
 cron/refresh.php CLI scheduled-refresh entry point (see also public/cron.php)
 ```
 
-Every `public/api/*.php` endpoint requires login except `auth.php`; `public/cron.php` is unauthenticated but gated by `CRON_TOKEN`. See inline docblocks / `src/` for endpoint details.
+Every `public/api/*.php` endpoint requires login except `auth.php` (`users.php` and `update-package.php` require an admin); `public/cron.php` is unauthenticated but gated by `CRON_TOKEN`. See inline docblocks / `src/` for endpoint details.

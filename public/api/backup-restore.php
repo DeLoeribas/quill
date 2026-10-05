@@ -88,7 +88,7 @@ $previousFeedIds = [];
 // (which deliberately preserves the existing settings/ui_prefs key), a
 // backup restore replaces the *entire* feeds.json document, since
 // saved_searches and ui_prefs are themselves part of what's being restored.
-Storage::update(FEEDS_FILE, ['folders' => [], 'feeds' => []], function (array $data) use ($restoredFeedsData, &$previousFeedIds) {
+Storage::update(feeds_file(), ['folders' => [], 'feeds' => []], function (array $data) use ($restoredFeedsData, &$previousFeedIds) {
     $previousFeedIds = array_column($data['feeds'], 'id');
     return $restoredFeedsData;
 });

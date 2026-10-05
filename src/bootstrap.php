@@ -7,6 +7,7 @@ ini_set('display_errors', '0');
 
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/Storage.php';
+require_once __DIR__ . '/Users.php';
 require_once __DIR__ . '/Auth.php';
 require_once __DIR__ . '/RateLimiter.php';
 
@@ -179,9 +180,31 @@ function sort_folders(array $folders): array
     return $indexed;
 }
 
+/** data/users/<id>/ — everything belonging to one account (feeds, folders, items, page texts, UI prefs). */
+function user_data_dir(string $userId): string
+{
+    return DATA_DIR . '/users/' . $userId;
+}
+
+/** The current user's folders, feeds, saved searches and settings (see CurrentUser). */
+function feeds_file(): string
+{
+    return user_data_dir(CurrentUser::id()) . '/feeds.json';
+}
+
+function items_dir(): string
+{
+    return user_data_dir(CurrentUser::id()) . '/items';
+}
+
+function pages_dir(): string
+{
+    return user_data_dir(CurrentUser::id()) . '/pages';
+}
+
 function items_file_path(string $feedId): string
 {
-    return ITEMS_DIR . '/' . $feedId . '.json';
+    return items_dir() . '/' . $feedId . '.json';
 }
 
 /** Keeps a plain-text log from growing without bound: once it exceeds $maxBytes, trims it down to roughly its last $maxBytes, dropping the leading partial line. */
@@ -275,9 +298,12 @@ if (!defined('FETCH_RETRY_ATTEMPTS')) {
 if (!defined('FETCH_TRANSIENT_TOLERANCE')) {
     define('FETCH_TRANSIENT_TOLERANCE', 3);
 }
-if (!defined('PAGES_DIR')) {
-    define('PAGES_DIR', DATA_DIR . '/pages');
+if (!defined('USERS_FILE')) {
+    define('USERS_FILE', DATA_DIR . '/users.json');
 }
+
+// Moves a pre-multi-user install's data into data/users/<id>/ on the first request after the update.
+Users::migrateLegacyIfNeeded();
 
 function read_items_file(string $feedId): array
 {
@@ -287,7 +313,7 @@ function read_items_file(string $feedId): array
 /** Per-feed store of opened articles' page text, keyed by item id: { "<itemId>": { "text": ..., "fetched_at": ... } }. Kept out of the items file so list requests don't pay for it. */
 function page_texts_file_path(string $feedId): string
 {
-    return PAGES_DIR . '/' . $feedId . '.json';
+    return pages_dir() . '/' . $feedId . '.json';
 }
 
 function read_page_texts(string $feedId): array
@@ -484,8 +510,8 @@ function match_count_for_query(string $query, array $feeds): int
 }
 
 /**
- * Seeds FEEDS_FILE from data/default-feeds.json the first time it's called
- * on an installation that has no feeds file yet (see public/api/auth.php's
+ * Seeds the current user's feeds file from data/default-feeds.json the first time it's called
+ * for a user who has no feeds file yet (a new account — see public/api/auth.php's
  * 'setup' action) — never touches an existing feeds.json, whether real or
  * previously (re)seeded. Returns the ids of the feeds it created so the
  * caller can refresh them (fetching real titles/favicons), or [] if nothing
@@ -493,7 +519,7 @@ function match_count_for_query(string $query, array $feeds): int
  */
 function seed_default_feeds_if_empty(): array
 {
-    if (file_exists(FEEDS_FILE) || !is_file(DATA_DIR . '/default-feeds.json')) {
+    if (file_exists(feeds_file()) || !is_file(DATA_DIR . '/default-feeds.json')) {
         return [];
     }
 
@@ -504,7 +530,7 @@ function seed_default_feeds_if_empty(): array
 
     $feedIds = [];
 
-    Storage::update(FEEDS_FILE, ['folders' => [], 'feeds' => []], function (array $data) use ($template, &$feedIds) {
+    Storage::update(feeds_file(), ['folders' => [], 'feeds' => []], function (array $data) use ($template, &$feedIds) {
         $folderIdsByName = [];
         foreach ((array) ($template['folders'] ?? []) as $order => $name) {
             $id = new_folder_id();

@@ -19,7 +19,7 @@ if ($method === 'POST') {
     }
 
     $saved = null;
-    Storage::update(FEEDS_FILE, ['folders' => [], 'feeds' => [], 'saved_searches' => []], function (array $data) use ($name, $query, &$saved) {
+    Storage::update(feeds_file(), ['folders' => [], 'feeds' => [], 'saved_searches' => []], function (array $data) use ($name, $query, &$saved) {
         $saved = [
             'id' => new_saved_search_id(),
             'name' => $name,
@@ -40,7 +40,7 @@ if ($method === 'DELETE') {
     }
 
     $found = false;
-    Storage::update(FEEDS_FILE, ['folders' => [], 'feeds' => [], 'saved_searches' => []], function (array $data) use ($id, &$found) {
+    Storage::update(feeds_file(), ['folders' => [], 'feeds' => [], 'saved_searches' => []], function (array $data) use ($id, &$found) {
         $before = count($data['saved_searches'] ?? []);
         $data['saved_searches'] = array_values(array_filter($data['saved_searches'] ?? [], fn ($s) => $s['id'] !== $id));
         $found = count($data['saved_searches']) < $before;

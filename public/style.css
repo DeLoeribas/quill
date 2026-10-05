@@ -152,6 +152,57 @@ body {
   font-size: 13px;
 }
 
+.settings-users-list {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+}
+
+.settings-users-list li {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 13px;
+}
+
+.settings-user-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.settings-user-role {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.settings-user-delete.confirming {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+.settings-user-reset-row {
+  flex-basis: 100%;
+}
+
+.settings-user-add-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settings-user-add-actions {
+  align-items: center;
+  justify-content: space-between;
+}
+
+.settings-password-form {
+  margin: 8px 0;
+}
+
 .settings-update-download-btn {
   margin-top: 8px;
 }

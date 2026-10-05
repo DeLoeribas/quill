@@ -10,7 +10,7 @@ $method = $_SERVER['REQUEST_METHOD'];
 Auth::requireLogin();
 
 if ($method === 'GET') {
-    $feedsData = Storage::read(FEEDS_FILE, ['folders' => [], 'feeds' => []]);
+    $feedsData = Storage::read(feeds_file(), ['folders' => [], 'feeds' => []]);
     $feedTitleById = array_column($feedsData['feeds'], 'title', 'id');
 
     // Single-item detail fetch: the list branch below strips `summary` (often many
@@ -133,7 +133,7 @@ if ($method === 'POST') {
     $body = read_json_body();
     $action = $body['action'] ?? '';
 
-    $feedsData = Storage::read(FEEDS_FILE, ['folders' => [], 'feeds' => []]);
+    $feedsData = Storage::read(feeds_file(), ['folders' => [], 'feeds' => []]);
 
     if ($action === 'mark_read' || $action === 'mark_unread') {
         $itemIds = $body['item_ids'] ?? [];

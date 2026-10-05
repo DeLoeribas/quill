@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#14161a" media="(prefers-color-scheme: dark)">
 <title>Quill</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
-<link rel="stylesheet" href="style.css?v=31">
+<link rel="stylesheet" href="style.css?v=32">
 </head>
 <body>
 <header id="app-header" hidden>
@@ -90,13 +90,37 @@
     <section class="modal-section">
       <label>Version</label>
       <p id="settings-version-text" class="settings-version-text"></p>
-      <div class="modal-row settings-version-actions">
+      <div class="modal-row settings-version-actions" id="settings-check-update-row">
         <button id="settings-check-update-btn" type="button">Check for updates</button>
       </div>
     </section>
 
+    <section class="modal-section" id="settings-users-section" hidden>
+      <label>Users</label>
+      <ul id="settings-users-list" class="settings-users-list"></ul>
+      <form id="settings-user-add-form" class="settings-user-add-form">
+        <div class="modal-row">
+          <input type="text" id="settings-user-add-username" placeholder="Username" autocomplete="off" required>
+          <input type="password" id="settings-user-add-password" placeholder="Password (min. 8)" autocomplete="new-password" minlength="8" required>
+        </div>
+        <div class="modal-row settings-user-add-actions">
+          <label class="modal-checkbox-row">
+            <input type="checkbox" id="settings-user-add-admin">
+            Admin
+          </label>
+          <button type="submit">Add user</button>
+        </div>
+      </form>
+    </section>
+
     <section class="modal-section">
       <label>Account</label>
+      <p id="settings-account-text" class="settings-version-text"></p>
+      <form id="settings-password-form" class="modal-row settings-password-form">
+        <input type="password" id="settings-password-current" placeholder="Current password" autocomplete="current-password" required>
+        <input type="password" id="settings-password-new" placeholder="New password (min. 8)" autocomplete="new-password" minlength="8" required>
+        <button type="submit">Change</button>
+      </form>
       <div class="modal-row">
         <button id="settings-logout-btn" type="button">Log out</button>
       </div>
@@ -319,6 +343,6 @@
   <div class="spinner" aria-hidden="true"></div>
 </div>
 
-<script src="app.js?v=33"></script>
+<script src="app.js?v=34"></script>
 </body>
 </html>

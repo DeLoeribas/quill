@@ -10,7 +10,7 @@ Auth::requireLogin();
 // Every item that has a note — just enough to list them in the sidebar's Notes
 // section (newest first).
 if ($method === 'GET') {
-    $feedsData = Storage::read(FEEDS_FILE, ['folders' => [], 'feeds' => []]);
+    $feedsData = Storage::read(feeds_file(), ['folders' => [], 'feeds' => []]);
 
     $items = [];
     foreach ($feedsData['feeds'] as $feed) {

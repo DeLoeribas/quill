@@ -10,7 +10,15 @@ require_once __DIR__ . '/../src/RefreshService.php';
 // at the file's current end, so truncating it here doesn't race with that).
 cap_log_file(CRON_STDERR_LOG_FILE, CRON_LOG_MAX_BYTES);
 
-$results = RefreshService::refreshAll(false);
+// Each account has its own feeds, so refresh them one user at a time.
+$results = [];
+$users = Users::all();
+foreach ($users as $user) {
+    CurrentUser::set($user['id']);
+    foreach (RefreshService::refreshAll(false) as $outcome) {
+        $results[] = $outcome + ['user' => $user['username']];
+    }
+}
 
 $refreshed = 0;
 $skipped = 0;
@@ -35,15 +43,16 @@ foreach ($results as $outcome) {
     }
     if ($outcome['status'] === 'error') {
         $errors++;
-        fwrite(STDERR, sprintf("[%s] feed %s error: %s\n", now_iso8601(), $outcome['feed_id'], $outcome['error']));
+        fwrite(STDERR, sprintf("[%s] %s feed %s error: %s\n", now_iso8601(), $outcome['user'], $outcome['feed_id'], $outcome['error']));
         continue;
     }
     $refreshed++;
 }
 
 $line = sprintf(
-    "[%s] refreshed=%d skipped=%d disabled=%d deferred=%d errors=%d\n",
+    "[%s] users=%d refreshed=%d skipped=%d disabled=%d deferred=%d errors=%d\n",
     now_iso8601(),
+    count($users),
     $refreshed,
     $skipped,
     $disabled,

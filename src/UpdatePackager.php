@@ -27,7 +27,7 @@ final class UpdatePackager
     private const EXCLUDED_FILES = ['README.md', '.gitignore', 'src/config.php'];
 
     /** The only data/ entries shipped: everything else there is the install's own data. */
-    private const DATA_TEMPLATES = ['data/.htaccess', 'data/default-feeds.json', 'data/items/.gitkeep'];
+    private const DATA_TEMPLATES = ['data/.htaccess', 'data/default-feeds.json'];
 
     /** The repo is well under 1 MB; refuse anything absurd rather than fill the disk. */
     private const MAX_TOTAL_BYTES = 50 * 1024 * 1024;

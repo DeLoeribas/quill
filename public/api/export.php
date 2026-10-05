@@ -11,7 +11,7 @@ if ($method !== 'GET') {
 
 Auth::requireLogin();
 
-$data = Storage::read(FEEDS_FILE, ['folders' => [], 'feeds' => []]);
+$data = Storage::read(feeds_file(), ['folders' => [], 'feeds' => []]);
 
 $doc = new DOMDocument('1.0', 'UTF-8');
 $doc->formatOutput = true;

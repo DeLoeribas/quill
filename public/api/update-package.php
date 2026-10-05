@@ -12,7 +12,7 @@ if ($method !== 'GET' && $method !== 'POST') {
     json_error('Method not allowed', 405);
 }
 
-Auth::requireLogin();
+Auth::requireAdmin();
 
 try {
     $package = UpdatePackager::build();

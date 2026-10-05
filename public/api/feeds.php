@@ -11,9 +11,9 @@ $method = $_SERVER['REQUEST_METHOD'];
 Auth::requireLogin();
 
 if ($method === 'GET') {
-    // Fallback safety net: seed_default_feeds_if_empty() is a no-op once FEEDS_FILE
+    // Fallback safety net: seed_default_feeds_if_empty() is a no-op once the feeds file
     // exists, so this only ever does anything on an install whose account was created
-    // before FEEDS_FILE existed (e.g. auth.json shipped from an earlier deploy that
+    // before that file existed (e.g. auth.json shipped from an earlier deploy that
     // predated data/default-feeds.json, so the one-time seed in auth.php never ran).
     foreach (seed_default_feeds_if_empty() as $feedId) {
         try {
@@ -23,7 +23,7 @@ if ($method === 'GET') {
         }
     }
 
-    $data = Storage::read(FEEDS_FILE, ['folders' => [], 'feeds' => [], 'saved_searches' => []]);
+    $data = Storage::read(feeds_file(), ['folders' => [], 'feeds' => [], 'saved_searches' => []]);
     $feeds = array_map(function ($feed) {
         $feed['unread_count'] = unread_count_for($feed['id']);
         $feed['item_count'] = item_count_for($feed['id']);
@@ -60,7 +60,7 @@ if ($method === 'POST') {
     // gets the expected 409 instead of running into the discovery flow
     // below. The atomic check inside Storage::update further down remains
     // the real authority against a race between two concurrent adds.
-    $existing = Storage::read(FEEDS_FILE, ['folders' => [], 'feeds' => []]);
+    $existing = Storage::read(feeds_file(), ['folders' => [], 'feeds' => []]);
     foreach ($existing['feeds'] as $f) {
         if ($f['id'] === $feedId) {
             json_error('a feed with this url already exists', 409);
@@ -109,7 +109,7 @@ if ($method === 'POST') {
 
     $alreadyExists = false;
 
-    $data = Storage::update(FEEDS_FILE, ['folders' => [], 'feeds' => []], function (array $data) use ($feedId, $url, $folderId, $youtube, &$alreadyExists) {
+    $data = Storage::update(feeds_file(), ['folders' => [], 'feeds' => []], function (array $data) use ($feedId, $url, $folderId, $youtube, &$alreadyExists) {
         foreach ($data['feeds'] as $f) {
             if ($f['id'] === $feedId) {
                 $alreadyExists = true;
@@ -148,7 +148,7 @@ if ($method === 'POST') {
 
     RefreshService::refreshFeed($feedId, true);
 
-    $refreshed = Storage::read(FEEDS_FILE, ['folders' => [], 'feeds' => []]);
+    $refreshed = Storage::read(feeds_file(), ['folders' => [], 'feeds' => []]);
     $feed = null;
     foreach ($refreshed['feeds'] as $f) {
         if ($f['id'] === $feedId) {
@@ -172,7 +172,7 @@ if ($method === 'PATCH') {
 
     $found = false;
     $feed = null;
-    $data = Storage::update(FEEDS_FILE, ['folders' => [], 'feeds' => []], function (array $data) use ($id, $body, &$found, &$feed) {
+    $data = Storage::update(feeds_file(), ['folders' => [], 'feeds' => []], function (array $data) use ($id, $body, &$found, &$feed) {
         foreach ($data['feeds'] as $i => $f) {
             if ($f['id'] === $id) {
                 if (array_key_exists('folder_id', $body)) {
@@ -221,7 +221,7 @@ if ($method === 'DELETE') {
     }
 
     $found = false;
-    Storage::update(FEEDS_FILE, ['folders' => [], 'feeds' => []], function (array $data) use ($id, &$found) {
+    Storage::update(feeds_file(), ['folders' => [], 'feeds' => []], function (array $data) use ($id, &$found) {
         $before = count($data['feeds']);
         $data['feeds'] = array_values(array_filter($data['feeds'], fn ($f) => $f['id'] !== $id));
         $found = count($data['feeds']) < $before;

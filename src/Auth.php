@@ -6,12 +6,39 @@ final class Auth
 {
     public static function isConfigured(): bool
     {
-        return is_file(AUTH_FILE);
+        return Users::all() !== [];
+    }
+
+    /** The logged-in account, or null. Also drops a session whose account was deleted. */
+    public static function user(): ?array
+    {
+        $id = $_SESSION['user_id'] ?? null;
+        // Sessions from before multi-user support only carry 'authenticated'; they
+        // belonged to the single login, which the migration turned into the first admin.
+        if ($id === null && !empty($_SESSION['authenticated'])) {
+            $id = self::firstAdminId();
+            if ($id !== null) {
+                $_SESSION['user_id'] = $id;
+            }
+        }
+        if (!is_string($id)) {
+            return null;
+        }
+        $user = Users::find($id);
+        if ($user === null) {
+            $_SESSION = [];
+        }
+        return $user;
     }
 
     public static function isLoggedIn(): bool
     {
-        return !empty($_SESSION['authenticated']);
+        return self::user() !== null;
+    }
+
+    public static function isAdmin(): bool
+    {
+        return !empty(self::user()['is_admin']);
     }
 
     public static function setup(string $username, string $password): void
@@ -19,22 +46,17 @@ final class Auth
         if (self::isConfigured()) {
             throw new RuntimeException('Login is already configured');
         }
-        Storage::update(AUTH_FILE, [], fn () => [
-            'username' => $username,
-            'password_hash' => password_hash($password, PASSWORD_BCRYPT),
-        ]);
-        self::markLoggedIn();
+        $user = Users::create($username, $password, true);
+        self::markLoggedIn($user['id']);
     }
 
     public static function attempt(string $username, string $password): bool
     {
-        $data = Storage::read(AUTH_FILE, []);
-        if (!isset($data['username'], $data['password_hash'])
-            || $data['username'] !== $username
-            || !password_verify($password, $data['password_hash'])) {
+        $user = Users::findByUsername($username);
+        if ($user === null || !password_verify($password, $user['password_hash'])) {
             return false;
         }
-        self::markLoggedIn();
+        self::markLoggedIn($user['id']);
         return true;
     }
 
@@ -55,14 +77,37 @@ final class Auth
         ]);
     }
 
-    public static function requireLogin(): void
+    /** Rejects the request unless logged in, and points all per-user data paths at that account. */
+    public static function requireLogin(): array
     {
-        if (!self::isLoggedIn()) {
+        $user = self::user();
+        if ($user === null) {
             json_error('Unauthorized', 401);
         }
+        CurrentUser::set($user['id']);
+        return $user;
     }
 
-    private static function markLoggedIn(): void
+    public static function requireAdmin(): array
+    {
+        $user = self::requireLogin();
+        if (empty($user['is_admin'])) {
+            json_error('Forbidden', 403);
+        }
+        return $user;
+    }
+
+    private static function firstAdminId(): ?string
+    {
+        foreach (Users::all() as $user) {
+            if (!empty($user['is_admin'])) {
+                return $user['id'];
+            }
+        }
+        return null;
+    }
+
+    private static function markLoggedIn(string $userId): void
     {
         // bootstrap.php only resumes existing sessions; logging in is where a new one starts.
         if (session_status() !== PHP_SESSION_ACTIVE) {
@@ -70,5 +115,7 @@ final class Auth
         }
         session_regenerate_id(true);
         $_SESSION['authenticated'] = true;
+        $_SESSION['user_id'] = $userId;
+        CurrentUser::set($userId);
     }
 }

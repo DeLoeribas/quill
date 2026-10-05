@@ -762,6 +762,8 @@
 
   async function loadSettings() {
     const data = await get('settings.php');
+    state.username = data.username;
+    state.isAdmin = !!data.is_admin;
     state.appVersion = data.app_version;
     state.latestVersion = data.latest_version;
     state.updateNotes = data.update_notes || null;
@@ -842,6 +844,12 @@
   function renderSettingsVersion() {
     const el = document.getElementById('settings-version-text');
     el.textContent = '';
+    // Only admins are told about updates (the server leaves latest_version empty for everyone else).
+    document.getElementById('settings-check-update-row').hidden = !state.isAdmin;
+    if (!state.isAdmin) {
+      el.textContent = `Quill ${state.appVersion || ''}`;
+      return;
+    }
     if (!state.latestVersion) {
       el.textContent = `Quill ${state.appVersion || ''} — up to date`;
       return;
@@ -3690,8 +3698,155 @@
     document.getElementById('settings-mark-read-on-nav').checked = state.markReadOnNav;
     renderHighlightColorOptions();
     renderSettingsVersion();
+    renderSettingsAccount();
     document.getElementById('settings-overlay').hidden = false;
   }
+
+  // ---------- Accounts ----------
+
+  function renderSettingsAccount() {
+    document.getElementById('settings-account-text').textContent =
+      `Signed in as ${state.username}${state.isAdmin ? ' (admin)' : ''}`;
+    const section = document.getElementById('settings-users-section');
+    section.hidden = !state.isAdmin;
+    if (state.isAdmin) {
+      loadUsers();
+    }
+  }
+
+  async function loadUsers() {
+    try {
+      const data = await get('users.php');
+      renderUsers(data.users);
+    } catch (err) {
+      toast('Could not load users: ' + err.message);
+    }
+  }
+
+  function renderUsers(users) {
+    const list = document.getElementById('settings-users-list');
+    list.textContent = '';
+    for (const user of users) {
+      const li = document.createElement('li');
+
+      const name = document.createElement('span');
+      name.className = 'settings-user-name';
+      name.textContent = user.username;
+      li.appendChild(name);
+
+      if (user.is_admin) {
+        const role = document.createElement('span');
+        role.className = 'settings-user-role';
+        role.textContent = 'admin';
+        li.appendChild(role);
+      }
+
+      const resetBtn = document.createElement('button');
+      resetBtn.type = 'button';
+      resetBtn.textContent = 'Reset password';
+      resetBtn.addEventListener('click', () => toggleResetPasswordRow(li, user));
+      li.appendChild(resetBtn);
+
+      if (user.username !== state.username) {
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'settings-user-delete';
+        removeBtn.textContent = 'Delete';
+        removeBtn.title = `Delete ${user.username} and all their feeds and saved items`;
+        let confirmTimer = null;
+        removeBtn.addEventListener('click', async () => {
+          if (!removeBtn.classList.contains('confirming')) {
+            removeBtn.classList.add('confirming');
+            removeBtn.textContent = 'Delete?';
+            confirmTimer = setTimeout(() => {
+              removeBtn.classList.remove('confirming');
+              removeBtn.textContent = 'Delete';
+            }, 3000);
+            return;
+          }
+          clearTimeout(confirmTimer);
+          try {
+            await post('users.php', { action: 'delete', id: user.id });
+            toast(`Deleted ${user.username}`);
+            loadUsers();
+          } catch (err) {
+            toast('Could not delete user: ' + err.message);
+          }
+        });
+        li.appendChild(removeBtn);
+      }
+
+      list.appendChild(li);
+    }
+  }
+
+  function toggleResetPasswordRow(li, user) {
+    const existing = li.querySelector('.settings-user-reset-row');
+    if (existing) {
+      existing.remove();
+      return;
+    }
+    const form = document.createElement('form');
+    form.className = 'modal-row settings-user-reset-row';
+    const input = document.createElement('input');
+    input.type = 'password';
+    input.placeholder = `New password for ${user.username}`;
+    input.autocomplete = 'new-password';
+    input.minLength = 8;
+    input.required = true;
+    const save = document.createElement('button');
+    save.type = 'submit';
+    save.textContent = 'Save';
+    form.append(input, save);
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      try {
+        await post('users.php', { action: 'reset_password', id: user.id, password: input.value });
+        form.remove();
+        toast(`Password changed for ${user.username}`);
+      } catch (err) {
+        toast('Could not reset password: ' + err.message);
+      }
+    });
+    li.appendChild(form);
+    input.focus();
+  }
+
+  document.getElementById('settings-user-add-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const username = document.getElementById('settings-user-add-username');
+    const password = document.getElementById('settings-user-add-password');
+    const admin = document.getElementById('settings-user-add-admin');
+    try {
+      await post('users.php', {
+        action: 'create',
+        username: username.value.trim(),
+        password: password.value,
+        is_admin: admin.checked,
+      });
+      toast(`Added ${username.value.trim()}`);
+      username.value = '';
+      password.value = '';
+      admin.checked = false;
+      loadUsers();
+    } catch (err) {
+      toast('Could not add user: ' + err.message);
+    }
+  });
+
+  document.getElementById('settings-password-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const current = document.getElementById('settings-password-current');
+    const next = document.getElementById('settings-password-new');
+    try {
+      await post('auth.php', { action: 'change_password', current_password: current.value, new_password: next.value });
+      current.value = '';
+      next.value = '';
+      toast('Password changed');
+    } catch (err) {
+      toast('Could not change password: ' + err.message);
+    }
+  });
 
   function closeSettings() {
     document.getElementById('settings-overlay').hidden = true;

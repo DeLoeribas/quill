@@ -8,7 +8,7 @@ $method = $_SERVER['REQUEST_METHOD'];
 Auth::requireLogin();
 
 if ($method === 'GET') {
-    $feedsData = Storage::read(FEEDS_FILE, ['folders' => [], 'feeds' => []]);
+    $feedsData = Storage::read(feeds_file(), ['folders' => [], 'feeds' => []]);
 
     $counts = [];
     foreach ($feedsData['feeds'] as $feed) {

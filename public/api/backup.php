@@ -31,7 +31,7 @@ header('Cache-Control: no-store, no-cache, must-revalidate, private');
 header('Pragma: no-cache');
 header('X-LiteSpeed-Cache-Control: no-cache');
 
-$feedsData = Storage::read(FEEDS_FILE, ['folders' => [], 'feeds' => []]);
+$feedsData = Storage::read(feeds_file(), ['folders' => [], 'feeds' => []]);
 
 $items = [];
 foreach ($feedsData['feeds'] as $feed) {

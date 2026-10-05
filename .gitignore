@@ -2,7 +2,11 @@
 /data/auth.json
 /data/login_attempts.json
 /data/sessions/
-/data/items/*.json
+/data/items/
+/data/users/
+/data/users.json
+/data/auth.json.migrated
+/data/.migrate.lock
 /data/pages/
 /data/cron.log
 /data/cron-stderr.log

@@ -24,10 +24,11 @@ if ($method === 'POST') {
         if (Auth::isConfigured()) {
             json_error('Login is already configured', 409);
         }
-        if ($username === '' || strlen($password) < 8) {
-            json_error('Username is required and password must be at least 8 characters');
+        try {
+            Auth::setup($username, $password);
+        } catch (InvalidArgumentException $e) {
+            json_error($e->getMessage());
         }
-        Auth::setup($username, $password);
 
         foreach (seed_default_feeds_if_empty() as $feedId) {
             try {
@@ -48,6 +49,19 @@ if ($method === 'POST') {
             json_error('Invalid username or password', 401);
         }
         RateLimiter::recordSuccess($ip);
+        json_response(['ok' => true]);
+    }
+
+    if ($action === 'change_password') {
+        $user = Auth::requireLogin();
+        if (!password_verify((string) ($body['current_password'] ?? ''), $user['password_hash'])) {
+            json_error('Current password is incorrect', 403);
+        }
+        try {
+            Users::setPassword($user['id'], (string) ($body['new_password'] ?? ''));
+        } catch (InvalidArgumentException $e) {
+            json_error($e->getMessage());
+        }
         json_response(['ok' => true]);
     }
 

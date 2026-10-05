@@ -6,12 +6,16 @@ require_once __DIR__ . '/../../src/bootstrap.php';
 require_once __DIR__ . '/../../src/GithubVersionChecker.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
-Auth::requireLogin();
+$user = Auth::requireLogin();
+$isAdmin = !empty($user['is_admin']);
 
 if ($method === 'GET') {
-    $data = Storage::read(FEEDS_FILE, ['folders' => [], 'feeds' => []]);
-    $version = GithubVersionChecker::status();
+    $data = Storage::read(feeds_file(), ['folders' => [], 'feeds' => []]);
+    // Updating the app is the admin's job, so only they are told about (and offered) new versions.
+    $version = $isAdmin ? GithubVersionChecker::status() : ['version' => APP_VERSION, 'latest' => null, 'notes' => null];
     json_response([
+        'username' => $user['username'],
+        'is_admin' => $isAdmin,
         'app_version' => $version['version'],
         'latest_version' => $version['latest'],
         'update_notes' => $version['notes'],
@@ -28,6 +32,9 @@ if ($method === 'POST') {
     $body = read_json_body();
     if (($body['action'] ?? null) !== 'check_update') {
         json_error('unknown action');
+    }
+    if (!$isAdmin) {
+        json_error('Forbidden', 403);
     }
     $version = GithubVersionChecker::status(true);
     json_response([
@@ -49,7 +56,7 @@ if ($method === 'PATCH') {
         json_error('ui_prefs must be an object');
     }
 
-    $result = Storage::update(FEEDS_FILE, ['folders' => [], 'feeds' => []], function (array $data) use ($body) {
+    $result = Storage::update(feeds_file(), ['folders' => [], 'feeds' => []], function (array $data) use ($body) {
         $data['settings'] = $data['settings'] ?? [];
 
         $current = $data['settings']['ui_prefs'] ?? [];

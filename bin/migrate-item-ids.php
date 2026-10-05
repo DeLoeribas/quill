@@ -46,9 +46,10 @@ function migrate_item_ids_resolve_collision(array $a, array $b): array
 
 $dryRun = in_array('--dry-run', $argv, true);
 
-$files = glob(ITEMS_DIR . '/*.json') ?: [];
+// Every account's items, not just one user's.
+$files = glob(DATA_DIR . '/users/*/items/*.json') ?: [];
 if (empty($files)) {
-    echo "No item files found in " . ITEMS_DIR . " -- nothing to do.\n";
+    echo "No item files found in " . DATA_DIR . "/users/*/items -- nothing to do.\n";
     exit(0);
 }
 
@@ -56,7 +57,12 @@ if (!$dryRun) {
     $backupDir = DATA_DIR . '/items-backup-' . date('Ymd-His');
     mkdir($backupDir, 0775, true);
     foreach ($files as $file) {
-        copy($file, $backupDir . '/' . basename($file));
+        // Keep the <userId>/<feed>.json structure: two users can have the same feed id.
+        $userDir = $backupDir . '/' . basename(dirname($file, 2));
+        if (!is_dir($userDir)) {
+            mkdir($userDir, 0775, true);
+        }
+        copy($file, $userDir . '/' . basename($file));
     }
     echo "Backed up " . count($files) . " item file(s) to $backupDir\n\n";
 }
@@ -97,7 +103,7 @@ foreach ($files as $file) {
         Storage::update($file, ['feed_id' => $feedId, 'items' => []], $mutate);
     }
 
-    echo sprintf("%-40s changed=%-4d collisions=%d\n", basename($file), $changed, $collisions);
+    echo sprintf("%-60s changed=%-4d collisions=%d\n", basename(dirname($file, 2)) . '/' . basename($file), $changed, $collisions);
     $totalChanged += $changed;
     $totalCollisions += $collisions;
 }

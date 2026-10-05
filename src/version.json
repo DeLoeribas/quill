@@ -1,4 +1,4 @@
 {
-    "version": "1.0.9",
-    "notes": "The Save button's tooltip and the keyboard shortcuts help now show that pressing s saves or unsaves the selected item."
+    "version": "1.1.0",
+    "notes": "Multiple accounts: the admin can add users in Settings, and each user has their own feeds, saved items, tags, highlights and settings. Existing data moves to the admin account automatically."
 }

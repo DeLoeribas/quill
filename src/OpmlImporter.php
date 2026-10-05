@@ -35,7 +35,7 @@ final class OpmlImporter
         $feedsSkipped = 0;
         $removedFeedIds = [];
 
-        $savedData = Storage::update(FEEDS_FILE, ['folders' => [], 'feeds' => []], function (array $data) use ($body, &$foldersCreated, &$feedsCreated, &$feedsSkipped, &$removedFeedIds) {
+        $savedData = Storage::update(feeds_file(), ['folders' => [], 'feeds' => []], function (array $data) use ($body, &$foldersCreated, &$feedsCreated, &$feedsSkipped, &$removedFeedIds) {
             $removedFeedIds = array_column($data['feeds'], 'id');
 
             // Wipe existing folders/feeds but keep any other top-level keys (e.g. settings).

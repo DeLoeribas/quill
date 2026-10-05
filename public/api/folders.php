@@ -8,7 +8,7 @@ $method = $_SERVER['REQUEST_METHOD'];
 Auth::requireLogin();
 
 if ($method === 'GET') {
-    $data = Storage::read(FEEDS_FILE, ['folders' => [], 'feeds' => []]);
+    $data = Storage::read(feeds_file(), ['folders' => [], 'feeds' => []]);
     json_response(['folders' => sort_folders($data['folders'])]);
 }
 
@@ -20,7 +20,7 @@ if ($method === 'POST') {
     }
 
     $folder = null;
-    $data = Storage::update(FEEDS_FILE, ['folders' => [], 'feeds' => []], function (array $data) use ($name, &$folder) {
+    $data = Storage::update(feeds_file(), ['folders' => [], 'feeds' => []], function (array $data) use ($name, &$folder) {
         foreach ($data['folders'] as $existing) {
             if (strcasecmp(trim($existing['name']), $name) === 0) {
                 $folder = $existing;
@@ -49,7 +49,7 @@ if ($method === 'PATCH') {
 
     if ($direction === 'up' || $direction === 'down') {
         $found = false;
-        $data = Storage::update(FEEDS_FILE, ['folders' => [], 'feeds' => []], function (array $data) use ($id, $direction, &$found) {
+        $data = Storage::update(feeds_file(), ['folders' => [], 'feeds' => []], function (array $data) use ($id, $direction, &$found) {
             $sorted = sort_folders($data['folders']);
             foreach ($sorted as $i => $f) {
                 $sorted[$i]['order'] = $i;
@@ -91,7 +91,7 @@ if ($method === 'PATCH') {
 
     $folder = null;
     $found = false;
-    $data = Storage::update(FEEDS_FILE, ['folders' => [], 'feeds' => []], function (array $data) use ($id, $name, &$folder, &$found) {
+    $data = Storage::update(feeds_file(), ['folders' => [], 'feeds' => []], function (array $data) use ($id, $name, &$folder, &$found) {
         foreach ($data['folders'] as $i => $existing) {
             if ($existing['id'] === $id) {
                 $data['folders'][$i]['name'] = $name;
@@ -118,7 +118,7 @@ if ($method === 'DELETE') {
 
     $found = false;
     $removedFeedIds = [];
-    Storage::update(FEEDS_FILE, ['folders' => [], 'feeds' => []], function (array $data) use ($id, $cascade, &$found, &$removedFeedIds) {
+    Storage::update(feeds_file(), ['folders' => [], 'feeds' => []], function (array $data) use ($id, $cascade, &$found, &$removedFeedIds) {
         $before = count($data['folders']);
         $data['folders'] = array_values(array_filter($data['folders'], fn ($f) => $f['id'] !== $id));
         $found = count($data['folders']) < $before;
