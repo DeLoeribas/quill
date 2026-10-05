@@ -1,4 +1,4 @@
 {
-    "version": "1.0.8",
-    "notes": "Item lists are no longer capped at 200 items: older items now load automatically as you scroll down (or move down with the keyboard)."
+    "version": "1.0.9",
+    "notes": "The Save button's tooltip and the keyboard shortcuts help now show that pressing s saves or unsaves the selected item."
 }

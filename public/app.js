@@ -2244,7 +2244,7 @@
     starToggleBtn.type = 'button';
     starToggleBtn.className = 'item-star-toggle';
     starToggleBtn.innerHTML = item.starred ? BOOKMARK_FILLED_ICON : BOOKMARK_ICON;
-    starToggleBtn.title = item.starred ? 'Remove from Saved' : 'Save';
+    starToggleBtn.title = item.starred ? 'Remove from Saved (s)' : 'Save (s)';
     starToggleBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       toggleItemStar(item, li);
@@ -3277,7 +3277,7 @@
     const btn = rowEl.querySelector('.item-star-toggle');
     if (!btn) return;
     btn.innerHTML = starred ? BOOKMARK_FILLED_ICON : BOOKMARK_ICON;
-    btn.title = starred ? 'Remove from Saved' : 'Save';
+    btn.title = starred ? 'Remove from Saved (s)' : 'Save (s)';
   }
 
   async function toggleItemStar(item, rowEl) {
