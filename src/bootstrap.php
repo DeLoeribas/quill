@@ -5,6 +5,41 @@ declare(strict_types=1);
 error_reporting(E_ALL);
 ini_set('display_errors', '0');
 
+// A fatal error (a crash, an uncaught exception, a file missing after a partial
+// upload) otherwise reaches the browser as a bare "Request failed (500)". Send the
+// actual PHP error as the JSON error message instead, so the toast says what broke.
+if (PHP_SAPI !== 'cli') {
+    register_shutdown_function(function () {
+        $error = error_get_last();
+        if ($error === null || !in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) {
+            return;
+        }
+        $message = str_replace(dirname(__DIR__) . '/', '', strtok($error['message'], "\n"));
+        $where = str_replace(dirname(__DIR__) . '/', '', $error['file']) . ':' . $error['line'];
+        if (!headers_sent()) {
+            http_response_code(500);
+            header('Content-Type: application/json');
+            header('Cache-Control: no-store');
+        }
+        echo json_encode(['error' => "Server error: {$message} ({$where})"], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    });
+}
+
+// config.php is never part of an update package, so replacing the whole src/ folder
+// (instead of copying files over it) deletes it. Say so instead of crashing.
+if (!is_file(__DIR__ . '/config.php')) {
+    $message = 'src/config.php is missing. Restore your copy (it holds CRON_TOKEN and your settings), or copy src/config.sample.php to src/config.php.';
+    if (PHP_SAPI === 'cli') {
+        fwrite(STDERR, $message . "\n");
+        exit(1);
+    }
+    http_response_code(500);
+    header('Content-Type: application/json');
+    header('Cache-Control: no-store');
+    echo json_encode(['error' => $message]);
+    exit;
+}
+
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/Storage.php';
 require_once __DIR__ . '/Users.php';

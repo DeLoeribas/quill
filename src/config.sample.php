@@ -3,10 +3,7 @@
 // config.php is gitignored so local/deployed secrets never get committed.
 
 define('DATA_DIR', dirname(__DIR__) . '/data');
-define('ITEMS_DIR', DATA_DIR . '/items');
-// Text captured from articles' linked pages when opened, for full-text search.
-define('PAGES_DIR', DATA_DIR . '/pages');
-define('FEEDS_FILE', DATA_DIR . '/feeds.json');
+// Each account's feeds, items and captured page text live in DATA_DIR/users/<user_id>/.
 define('CRON_LOG_FILE', DATA_DIR . '/cron.log');
 // Path the README's cron/launchd examples redirect stderr to; capped alongside CRON_LOG_FILE.
 define('CRON_STDERR_LOG_FILE', DATA_DIR . '/cron-stderr.log');
@@ -52,10 +49,11 @@ define('HARD_MAX_ITEMS_PER_FEED', 1000);
 // Default refresh interval assigned to newly added feeds (minutes).
 define('DEFAULT_REFRESH_INTERVAL_MINUTES', 60);
 
-// Path to the file storing the single login's username + bcrypt password
-// hash, created via the in-app "create a login" flow the first time the
-// app is used.
-define('AUTH_FILE', DATA_DIR . '/auth.json');
+// Path to the file storing every account's username, bcrypt password hash
+// and admin flag. The first (admin) account is created via the in-app
+// "create a login" flow the first time the app is used; the admin adds
+// the others in Settings → Users.
+define('USERS_FILE', DATA_DIR . '/users.json');
 
 // Path to the file tracking failed login attempts per IP, for brute-force
 // lockout. Runtime state, not committed.
