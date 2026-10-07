@@ -349,7 +349,9 @@ if ($method === 'POST') {
             json_error('item not found or has no link', 404);
         }
 
-        if (array_key_exists($itemId, read_page_texts($feedId))) {
+        // Empty entries (stored by older versions when no text was found) count
+        // as not captured, so the page gets another try.
+        if ((read_page_texts($feedId)[$itemId]['text'] ?? '') !== '') {
             json_response(['ok' => true, 'cached' => true]);
         }
 
@@ -357,8 +359,10 @@ if ($method === 'POST') {
         // stall every other request from this browser) while it runs.
         session_write_close();
 
+        // Only keep real text: a failed or empty fetch (JS-rendered page, paywall,
+        // bot block) stores nothing, so a later open tries again.
         $text = ArticlePageTextResolver::resolve($link);
-        if ($text === null) {
+        if ($text === null || $text === '') {
             json_response(['ok' => false, 'cached' => false]);
         }
 

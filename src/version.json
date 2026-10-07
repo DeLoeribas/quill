@@ -1,4 +1,4 @@
 {
-    "version": "1.1.1",
-    "notes": "Server errors now show what went wrong instead of a bare \"Request failed (500)\", including a clear message when src/config.php is missing."
+    "version": "1.1.2",
+    "notes": "Press r to reload the current list, so items you've read drop out of Unread and new ones appear, without fetching the feeds again. Search now also finds articles you opened by clicking their title in the reading pane, and pages whose text couldn't be read are tried again the next time you open them."
 }

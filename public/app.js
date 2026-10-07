@@ -3097,6 +3097,12 @@
 
   document.getElementById('reading-pane-back-btn').addEventListener('click', closeMobileReadingPane);
 
+  // The reading pane's title is a plain link (so cmd/middle-click work natively);
+  // opening the page that way should make it searchable just like Show page does.
+  for (const type of ['click', 'auxclick']) {
+    document.getElementById('reading-pane-link').addEventListener(type, () => capturePageText(currentReadingPaneItem));
+  }
+
   // Keeps the selected row visible, but when keyboard nav pushes it past the
   // edge of #item-pane, jumps ahead by half a page instead of scrolling just
   // enough to reveal that one row — so repeated ArrowDown/j presses don't hug
@@ -3319,11 +3325,16 @@
     }
   }
 
+  // Server fetches and stores the page's text (once) so search can find it later.
+  function capturePageText(item) {
+    if (!item || !item.link) return;
+    post('items.php', { action: 'capture_page', feed_id: item.feed_id, item_id: item.id }).catch(() => {});
+  }
+
   async function openItem(item, rowEl) {
     if (item.link) {
       window.open(item.link, '_blank', 'noopener,noreferrer');
-      // Server fetches and stores the page's text (once) so search can find it later.
-      post('items.php', { action: 'capture_page', feed_id: item.feed_id, item_id: item.id }).catch(() => {});
+      capturePageText(item);
     }
     await markItemRead(item, rowEl);
   }
@@ -4135,6 +4146,16 @@
       if (!target) return;
       e.preventDefault();
       toggleItemStar(target.item, target.rowEl);
+      return;
+    }
+
+    // Reload the current list from the server (no feed fetching) — mainly so
+    // items you've read drop out of "Unread", which background polling
+    // deliberately never does on its own (see pollForUpdates).
+    if (e.key === 'r' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      if (isTyping) return;
+      e.preventDefault();
+      Promise.all([loadFeeds(), loadItems()]).catch((err) => toast('Reload failed: ' + err.message));
       return;
     }
 

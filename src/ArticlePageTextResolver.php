@@ -16,8 +16,9 @@ final class ArticlePageTextResolver
     private const STRIP_TAGS = ['script', 'style', 'noscript', 'nav', 'header', 'footer', 'aside', 'form', 'svg', 'iframe', 'template'];
 
     /**
-     * @return string|null null = fetch failed/timed out (retry on a later open),
-     *     '' = fetched fine but no text found, non-empty = the page text.
+     * @return string|null null = fetch failed/timed out, '' = fetched fine but
+     *     no text found, non-empty = the page text. Only non-empty text is
+     *     stored, so the other two are retried on a later open.
      */
     public static function resolve(?string $pageUrl): ?string
     {
