@@ -32,6 +32,24 @@ final class Storage
     }
 
     /**
+     * Best-effort write of a derived cache file (compact JSON, no lock): written to a
+     * temp file and renamed into place, so a concurrent reader never sees half of it.
+     */
+    public static function writeAtomic(string $path, array $data): void
+    {
+        $dir = dirname($path);
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0775, true);
+        }
+        $tmp = $path . '.' . bin2hex(random_bytes(4)) . '.tmp';
+        if (@file_put_contents($tmp, json_encode($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)) !== false) {
+            @rename($tmp, $path);
+        } else {
+            @unlink($tmp);
+        }
+    }
+
+    /**
      * Atomic read-modify-write. $mutator receives the current array (or
      * $default if the file is missing/invalid) and returns the new array
      * to persist. The exclusive lock is held for the full read-mutate-write

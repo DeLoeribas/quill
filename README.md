@@ -71,7 +71,7 @@ When a higher version number is on GitHub (from `src/version.json`), the footer 
 ```
 public/          document root: index.html, style.css, app.js, api/*.php, cron.php
 src/             PHP classes: Storage, Auth, FeedFetcher, FaviconResolver, FeedDiscovery, RefreshService, OpmlImporter, YouTubeResolver, UpdatePackager
-data/            users.json (accounts), users/<user_id>/{feeds.json, items/, items-index/, pages/}, cron.log
+data/            users.json (accounts), users/<user_id>/{feeds.json, items/, items-index/, search-index/, search-counts/, pages/}, cron.log
 cron/refresh.php CLI scheduled-refresh entry point (see also public/cron.php)
 ```
 

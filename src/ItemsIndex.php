@@ -99,17 +99,7 @@ final class ItemsIndex
             $index['items'][] = $item;
         }
 
-        $dir = dirname($indexPath);
-        if (!is_dir($dir)) {
-            @mkdir($dir, 0775, true);
-        }
-        // Write-then-rename so a concurrent reader never sees a half-written index.
-        $tmp = $indexPath . '.' . bin2hex(random_bytes(4)) . '.tmp';
-        if (@file_put_contents($tmp, json_encode($index, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)) !== false) {
-            @rename($tmp, $indexPath);
-        } else {
-            @unlink($tmp);
-        }
+        Storage::writeAtomic($indexPath, $index);
 
         flock($fh, LOCK_UN);
         fclose($fh);

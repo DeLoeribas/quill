@@ -83,10 +83,11 @@ if ($method === 'GET') {
 
     $items = [];
     foreach ($feedIds as $fid) {
-        // Only a search needs the summaries and the (much larger) captured page texts;
-        // every other list reads the much smaller summary-less index.
-        $itemsData = empty($queryPatterns) ? read_items_index($fid) : read_items_file($fid);
-        $pageTexts = empty($queryPatterns) ? [] : read_page_texts($fid);
+        $itemsData = read_items_index($fid);
+        $feedTitle = $feedTitleById[$fid] ?? null;
+        // A search matches against the feed's search index (summaries and captured
+        // page texts, already stripped and folded) instead of the full items file.
+        $matchingIds = empty($queryPatterns) ? null : matching_item_ids($fid, $feedTitle, $queryPatterns);
         foreach ($itemsData['items'] as $item) {
             if ($unreadOnly && !empty($item['read'])) {
                 continue;
@@ -103,8 +104,7 @@ if ($method === 'GET') {
             if ($tag !== '' && !in_array($tag, $item['tags'] ?? [], true)) {
                 continue;
             }
-            $feedTitle = $feedTitleById[$fid] ?? null;
-            if (!item_matches_query($item, $feedTitle, $queryPatterns, $pageTexts[$item['id']]['text'] ?? null)) {
+            if ($matchingIds !== null && !isset($matchingIds[$item['id']])) {
                 continue;
             }
             $item['feed_id'] = $fid;
