@@ -81,14 +81,18 @@ if ($method === 'GET') {
         $feedIds = array_column($feedsData['feeds'], 'id');
     }
 
-    $items = [];
+    // Only the requested page is built into full rows: the filter pass just records each
+    // match's publish date and where to find it, which is all the sort needs.
+    $indexes = [];
+    $dates = [];
+    $refs = [];
     foreach ($feedIds as $fid) {
-        $itemsData = read_items_index($fid);
+        $indexes[$fid] = read_items_index($fid);
         $feedTitle = $feedTitleById[$fid] ?? null;
         // A search matches against the feed's search index (summaries and captured
         // page texts, already stripped and folded) instead of the full items file.
         $matchingIds = empty($queryPatterns) ? null : matching_item_ids($fid, $feedTitle, $queryPatterns);
-        foreach ($itemsData['items'] as $item) {
+        foreach ($indexes[$fid]['items'] as $i => $item) {
             if ($unreadOnly && !empty($item['read'])) {
                 continue;
             }
@@ -107,20 +111,27 @@ if ($method === 'GET') {
             if ($matchingIds !== null && !isset($matchingIds[$item['id']])) {
                 continue;
             }
-            $item['feed_id'] = $fid;
-            $item['feed_title'] = $feedTitle;
-            unset($item['summary']);
-            $items[] = $item;
+            $dates[] = (string) ($item['published'] ?? '');
+            $refs[] = [$fid, $i];
         }
     }
 
-    usort($items, fn ($a, $b) => $order === 'asc'
-        ? strcmp((string) $a['published'], (string) $b['published'])
-        : strcmp((string) $b['published'], (string) $a['published']));
-
-    $total = count($items);
+    // array_multisort() sorts in C, far faster than usort() with a PHP callback over
+    // thousands of items. The position tiebreaker keeps equal dates in feed order.
+    $total = count($refs);
+    $positions = $total > 0 ? range(0, $total - 1) : [];
+    array_multisort($dates, $order === 'asc' ? SORT_ASC : SORT_DESC, SORT_STRING, $positions, SORT_ASC, SORT_NUMERIC);
     if ($limit !== null || $offset > 0) {
-        $items = array_slice($items, $offset, $limit);
+        $positions = array_slice($positions, $offset, $limit);
+    }
+
+    $items = [];
+    foreach ($positions as $position) {
+        [$fid, $i] = $refs[$position];
+        $item = $indexes[$fid]['items'][$i];
+        $item['feed_id'] = $fid;
+        $item['feed_title'] = $feedTitleById[$fid] ?? null;
+        $items[] = $item;
     }
 
     json_response([

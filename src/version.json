@@ -1,4 +1,4 @@
 {
-    "version": "1.1.4",
-    "notes": "Saved searches and search are faster: their match counts are remembered until a feed's items change, and searches use a ready-made index instead of rereading every article."
+    "version": "1.1.5",
+    "notes": "The item list loads faster with large collections: items are sorted far more efficiently, and only the page being shown is built."
 }
