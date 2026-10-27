@@ -42,6 +42,7 @@ if (!is_file(__DIR__ . '/config.php')) {
 
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/Storage.php';
+require_once __DIR__ . '/ItemsIndex.php';
 require_once __DIR__ . '/Users.php';
 require_once __DIR__ . '/Auth.php';
 require_once __DIR__ . '/RateLimiter.php';
@@ -355,6 +356,14 @@ function read_items_file(string $feedId): array
     return Storage::read(items_file_path($feedId), ['feed_id' => $feedId, 'items' => []]);
 }
 
+ItemsIndex::register();
+
+/** A feed's items without `summary`, plus total/unread/starred counts (see ItemsIndex). Use this unless you need summaries. */
+function read_items_index(string $feedId): array
+{
+    return ItemsIndex::read(items_file_path($feedId), $feedId);
+}
+
 /** Per-feed store of opened articles' page text, keyed by item id: { "<itemId>": { "text": ..., "fetched_at": ... } }. Kept out of the items file so list requests don't pay for it. */
 function page_texts_file_path(string $feedId): string
 {
@@ -369,7 +378,7 @@ function read_page_texts(string $feedId): array
 /** Deletes a feed's items file and its stored page texts, when the feed itself is removed. */
 function delete_feed_data_files(string $feedId): void
 {
-    foreach ([items_file_path($feedId), page_texts_file_path($feedId)] as $path) {
+    foreach ([items_file_path($feedId), ItemsIndex::indexPathFor(items_file_path($feedId)), page_texts_file_path($feedId)] as $path) {
         if (is_file($path)) {
             unlink($path);
         }
@@ -618,29 +627,15 @@ function seed_default_feeds_if_empty(): array
 
 function unread_count_for(string $feedId): int
 {
-    $itemsData = read_items_file($feedId);
-    $count = 0;
-    foreach ($itemsData['items'] as $item) {
-        if (empty($item['read'])) {
-            $count++;
-        }
-    }
-    return $count;
+    return read_items_index($feedId)['unread'];
 }
 
 function item_count_for(string $feedId): int
 {
-    return count(read_items_file($feedId)['items']);
+    return read_items_index($feedId)['total'];
 }
 
 function starred_count_for(string $feedId): int
 {
-    $itemsData = read_items_file($feedId);
-    $count = 0;
-    foreach ($itemsData['items'] as $item) {
-        if (!empty($item['starred'])) {
-            $count++;
-        }
-    }
-    return $count;
+    return read_items_index($feedId)['starred'];
 }

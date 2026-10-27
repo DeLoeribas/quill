@@ -2,6 +2,14 @@
 
 final class Storage
 {
+    /** @var callable[] Called with the path after every Storage::update() write, so derived caches can drop their copy. */
+    private static array $writeListeners = [];
+
+    public static function onWrite(callable $listener): void
+    {
+        self::$writeListeners[] = $listener;
+    }
+
     /** Shared-lock read. Returns $default if the file doesn't exist or is invalid JSON. */
     public static function read(string $path, array $default): array
     {
@@ -55,6 +63,11 @@ final class Storage
         ftruncate($fh, 0);
         fwrite($fh, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
         fflush($fh);
+        // Still under the exclusive lock, so a reader rebuilding a derived cache (which
+        // holds a shared lock on this file) can't slip in between the write and this.
+        foreach (self::$writeListeners as $listener) {
+            $listener($path);
+        }
         flock($fh, LOCK_UN);
         fclose($fh);
 

@@ -8,7 +8,7 @@ A minimal, self-hosted RSS/Atom/JSON feed reader for one person. Plain PHP (no f
 
 - Add feeds by URL, or paste a site URL and pick one or more of its discovered feeds. Discovery covers `<link rel="alternate">` tags, feed links on the page, the site's feed-directory page, conventional paths like `/rss.xml`, and per-section feeds of news sites.
 - Folders (collapsible sidebar tree), Unread/Saved/Notes views, saved searches with live match counts in their own collapsible sidebar group
-- Accent-insensitive search across every feed — including the full page text of articles you've opened, captured server-side the first time you open one
+- Accent-insensitive search across every feed, including the full page text of articles you've opened, captured server-side the first time you open one
 - Read/unread and starred tracking, personal notes and tags on items (tag autocomplete, browsable sidebar tag list, a "Notes" view for items with a note attached), per-feed content filters, per-feed enable/disable
 - Text highlights: select a passage in an article and press Highlight (click it to remove), with highlighted articles in their own collapsible sidebar group and a choice of highlight color in Settings
 - Manual refresh or scheduled refresh (cron/launchd/URL-based), with per-feed refresh intervals (auto-detected from feeds that declare their own, editable otherwise)
@@ -16,7 +16,7 @@ A minimal, self-hosted RSS/Atom/JSON feed reader for one person. Plain PHP (no f
 - Visible items (and their images) are prefetched in the background, so opening one is instant
 - OPML import/export and full backup/restore (zip/gzip/JSON)
 - Update notice when a newer version is on GitHub, with a one-click download of an upload-ready package that leaves your config and data alone
-- Multiple accounts, each with its own feeds, folders, saved items, tags, highlights and settings; the admin adds and removes them in Settings (bcrypt passwords, PHP session — no database, no third-party auth)
+- Multiple accounts, each with its own feeds, folders, saved items, tags, highlights and settings; the admin adds and removes them in Settings (bcrypt passwords, PHP session; no database, no third-party auth)
 
 See the in-app Settings panel and feed row menus for the full interaction surface, or [DOCUMENTATION.md](DOCUMENTATION.md) for the complete reference.
 
@@ -46,10 +46,10 @@ The manual "Refresh all" button always force-refreshes regardless of interval.
 
 ## Deploying
 
-1. Run `bin/package-for-deploy.sh` — builds `./deploy/` from `git archive` (no local data, ever) and scaffolds `src/config.php`. Upload its contents; point the doc root at `public/` if possible.
+1. Run `bin/package-for-deploy.sh`: it builds `./deploy/` from `git archive` (no local data, ever) and scaffolds `src/config.php`. Upload its contents; point the doc root at `public/` if possible.
 2. No custom doc root? `.htaccess` in `data/`/`src/` blocks direct access as a fallback.
 3. Optional: HTTP Basic Auth via `public/.htaccess` as defense-in-depth on top of app login.
-4. Set up scheduled refresh (above) — Option A (URL cron) works on any host.
+4. Set up scheduled refresh (above). Option A (URL cron) works on any host.
 
 ## Updating
 
@@ -71,7 +71,7 @@ When a higher version number is on GitHub (from `src/version.json`), the footer 
 ```
 public/          document root: index.html, style.css, app.js, api/*.php, cron.php
 src/             PHP classes: Storage, Auth, FeedFetcher, FaviconResolver, FeedDiscovery, RefreshService, OpmlImporter, YouTubeResolver, UpdatePackager
-data/            users.json (accounts), users/<user_id>/{feeds.json, items/, pages/}, cron.log
+data/            users.json (accounts), users/<user_id>/{feeds.json, items/, items-index/, pages/}, cron.log
 cron/refresh.php CLI scheduled-refresh entry point (see also public/cron.php)
 ```
 

@@ -83,8 +83,9 @@ if ($method === 'GET') {
 
     $items = [];
     foreach ($feedIds as $fid) {
-        $itemsData = read_items_file($fid);
-        // Only a search needs the (much larger) captured page texts.
+        // Only a search needs the summaries and the (much larger) captured page texts;
+        // every other list reads the much smaller summary-less index.
+        $itemsData = empty($queryPatterns) ? read_items_index($fid) : read_items_file($fid);
         $pageTexts = empty($queryPatterns) ? [] : read_page_texts($fid);
         foreach ($itemsData['items'] as $item) {
             if ($unreadOnly && !empty($item['read'])) {

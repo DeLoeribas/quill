@@ -14,7 +14,7 @@ if ($method === 'GET') {
 
     $items = [];
     foreach ($feedsData['feeds'] as $feed) {
-        $itemsData = read_items_file($feed['id']);
+        $itemsData = read_items_index($feed['id']);
         foreach ($itemsData['items'] as $item) {
             $count = count($item['highlights'] ?? []);
             if ($count === 0) {

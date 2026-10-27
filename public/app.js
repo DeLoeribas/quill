@@ -1808,7 +1808,7 @@
         // The server absorbed this one rather than marking the feed broken (it
         // stays due, so the next refresh retries it) — but on a manual refresh
         // the user is watching, so say what happened instead of "up to date".
-        toast(`"${name}" didn't respond (${outcome.error}) — will retry`);
+        toast(`"${name}" didn't respond (${outcome.error}), will retry`);
       } else {
         toast(outcome.new_items ? `"${name}": ${outcome.new_items} new item${outcome.new_items === 1 ? '' : 's'}` : `"${name}" is up to date`);
       }
@@ -4326,10 +4326,8 @@
 
   async function init() {
     await loadSettings();
-    await loadFeeds();
-    await loadTags();
-    await loadHighlightedItems();
-    await loadNotedItems();
+    // Independent of each other, so fetch them side by side rather than one by one.
+    await Promise.all([loadFeeds(), loadTags(), loadHighlightedItems(), loadNotedItems()]);
     restorePersistedFilter();
     renderSidebar();
     updateSortOrderButton();

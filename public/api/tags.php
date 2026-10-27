@@ -12,7 +12,7 @@ if ($method === 'GET') {
 
     $counts = [];
     foreach ($feedsData['feeds'] as $feed) {
-        $itemsData = read_items_file($feed['id']);
+        $itemsData = read_items_index($feed['id']);
         foreach ($itemsData['items'] as $item) {
             foreach ($item['tags'] ?? [] as $tag) {
                 $counts[$tag] = ($counts[$tag] ?? 0) + 1;

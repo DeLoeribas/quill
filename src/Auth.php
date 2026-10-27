@@ -85,6 +85,12 @@ final class Auth
             json_error('Unauthorized', 401);
         }
         CurrentUser::set($user['id']);
+        // Nothing after this point writes to the session, and keeping it open would hold
+        // the session file's lock for the whole request, so the browser's parallel API
+        // calls (e.g. the ones made at startup) would run one after another.
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_write_close();
+        }
         return $user;
     }
 
