@@ -70,12 +70,19 @@ final class Storage
         flock($fh, LOCK_EX);
 
         $raw = stream_get_contents($fh);
-        $data = json_decode((string) $raw, true);
-        if (!is_array($data)) {
-            $data = $default;
-        }
+        $original = json_decode((string) $raw, true);
+        $data = is_array($original) ? $original : $default;
 
         $data = $mutator($data);
+
+        // Nothing changed: skip the write so derived caches (items/search index) survive.
+        // Most refreshes of a feed without new items land here, and rebuilding every
+        // feed's index on the next page load is what made some reloads take seconds.
+        if ($data === $original) {
+            flock($fh, LOCK_UN);
+            fclose($fh);
+            return $data;
+        }
 
         rewind($fh);
         ftruncate($fh, 0);

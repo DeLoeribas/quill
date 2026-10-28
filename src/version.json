@@ -1,4 +1,4 @@
 {
-    "version": "1.1.5",
-    "notes": "The item list loads faster with large collections: items are sorted far more efficiently, and only the page being shown is built."
+    "version": "1.1.6",
+    "notes": "Reloading is consistently fast again: a background feed refresh that finds nothing new no longer throws away the item list and search caches."
 }
