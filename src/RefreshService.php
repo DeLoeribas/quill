@@ -390,6 +390,10 @@ final class RefreshService
 
         self::prunePageTexts($feedId, array_column($finalData['items'], 'id'));
 
+        // The write above dropped this feed's items index when anything changed; rebuild
+        // it here so the first page load after a refresh doesn't pay for it.
+        ItemsIndex::warm($path, $feedId);
+
         return $newCount;
     }
 

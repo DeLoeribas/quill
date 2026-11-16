@@ -65,6 +65,20 @@ final class ItemsIndex
         return self::$memo[$itemsPath] = $index ?? $empty;
     }
 
+    /**
+     * Rebuilds the index now if a write deleted it, so the next page load doesn't have to.
+     * Called by the feed refresh (cron); unlike read() it keeps nothing in memory, as a
+     * refresh goes through every feed of every user.
+     */
+    public static function warm(string $itemsPath, string $feedId): void
+    {
+        $indexPath = self::indexPathFor($itemsPath);
+        if ($indexPath === null || !is_file($itemsPath) || is_file($indexPath)) {
+            return;
+        }
+        self::rebuild($itemsPath, $indexPath, $feedId);
+    }
+
     private static function rebuild(string $itemsPath, string $indexPath, string $feedId): ?array
     {
         $fh = fopen($itemsPath, 'r');

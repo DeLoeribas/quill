@@ -25,9 +25,29 @@ final class GithubVersionChecker
      */
     public static function status(bool $force = false): array
     {
+        return self::compare(self::remoteVersion($force));
+    }
+
+    /**
+     * Same shape as status(), but only from the last stored check: never goes to GitHub,
+     * even when that check is older than GITHUB_VERSION_CACHE_SECONDS. Used on page load,
+     * so the first visit after the cache expires doesn't wait on GitHub before showing
+     * anything; the client asks for a fresh status() right after rendering.
+     */
+    public static function cachedStatus(): array
+    {
+        $cache = Storage::read(GITHUB_VERSION_CACHE_FILE, []);
+        $remote = array_key_exists('version', $cache)
+            ? ['version' => $cache['version'], 'notes' => $cache['notes'] ?? null]
+            : null;
+        return self::compare($remote);
+    }
+
+    /** @param array{version: ?string, notes: ?string}|null $remote */
+    private static function compare(?array $remote): array
+    {
         $upToDate = ['version' => APP_VERSION, 'latest' => null, 'notes' => null];
 
-        $remote = self::remoteVersion($force);
         if ($remote === null || $remote['version'] === null || APP_VERSION === 'unknown') {
             return $upToDate;
         }

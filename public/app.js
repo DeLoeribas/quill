@@ -54,6 +54,7 @@
   };
 
   let hoveredItem = null; // { item, rowEl } for the currently mouse-hovered row, or null
+  let booting = true; // true while init() loads the app's data (see boot())
 
   // ---------- API helpers ----------
 
@@ -72,7 +73,9 @@
       parseFailed = true;
     }
     if (!res.ok) {
-      if (res.status === 401 && path !== 'auth.php') {
+      // While booting, boot() itself decides which login screen to show (it needs
+      // auth.php's `configured` for that), so don't guess one here.
+      if (res.status === 401 && path !== 'auth.php' && !booting) {
         showLoginScreen(true);
       }
       const err = new Error((data && data.error) || `Request failed (${res.status})`);
@@ -388,6 +391,9 @@
     state.folders = data.folders;
     state.feeds = data.feeds;
     state.savedSearches = data.saved_searches || [];
+    // At startup settings load alongside this, and init() renders once both are in:
+    // rendering now could briefly show the wrong collapsed folders or sort order.
+    if (booting) return;
     renderSidebar();
     populateFolderSelect();
     renderLastUpdated();
@@ -495,14 +501,15 @@
 
   // Only the version fields of settings.php: loadSettings() also applies ui_prefs,
   // which mid-session would undo layout changes made in this tab since startup.
+  // Also run once right after startup: settings.php only reports the last stored check, so
+  // that a check against GitHub never holds up the page load (see refresh_version there).
   async function refreshVersionInfo() {
     lastVersionCheck = Date.now();
-    const data = await get('settings.php');
-    const prefs = data.ui_prefs || {};
+    const data = await post('settings.php', { action: 'refresh_version' });
     state.appVersion = data.app_version;
     state.latestVersion = data.latest_version;
     state.updateNotes = data.update_notes || null;
-    state.dismissedUpdateVersion = typeof prefs.dismissed_update_version === 'string' ? prefs.dismissed_update_version : null;
+    state.dismissedUpdateVersion = typeof data.dismissed_update_version === 'string' ? data.dismissed_update_version : null;
     renderAppFooter();
   }
 
@@ -4325,29 +4332,48 @@
   // ---------- Init ----------
 
   async function init() {
-    await loadSettings();
+    booting = true;
     // Independent of each other, so fetch them side by side rather than one by one.
-    await Promise.all([loadFeeds(), loadTags(), loadHighlightedItems(), loadNotedItems()]);
+    // The item list needs the restored filter (checked against the feeds) and the
+    // sort order (from settings), so it waits for these.
+    try {
+      await Promise.all([loadSettings(), loadFeeds(), loadTags(), loadHighlightedItems(), loadNotedItems()]);
+    } finally {
+      booting = false;
+    }
+    hideLoginScreen();
     restorePersistedFilter();
     renderSidebar();
+    populateFolderSelect();
+    renderLastUpdated();
+    renderAppFooter();
     updateSortOrderButton();
     setPane(state.pane);
     await loadItems();
     restoreSelectedItem();
+    // In the background: may have to ask GitHub, which can take seconds.
+    refreshVersionInfo().catch(() => {});
     setInterval(renderLastUpdated, 30000);
     setInterval(pollForUpdates, 60000);
   }
 
+  // Goes straight to loading the app instead of first asking auth.php whether we're
+  // logged in, which saved a round trip on every page open. Only when that comes back
+  // 401 do we ask auth.php, to know which login screen to show.
   (async function boot() {
     try {
-      const status = await get('auth.php');
-      if (!status.authenticated) {
-        showLoginScreen(status.configured);
+      await init();
+    } catch (err) {
+      if (err.status === 401) {
+        try {
+          const status = await get('auth.php');
+          showLoginScreen(status.configured);
+        } catch (e) {
+          showLoginScreen(true);
+        }
         return;
       }
       hideLoginScreen();
-      await init();
-    } catch (err) {
       toast('Failed to load: ' + err.message);
     }
   })();
