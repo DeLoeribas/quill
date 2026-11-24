@@ -1,4 +1,4 @@
 {
-    "version": "1.1.7",
-    "notes": "The app opens faster: the check for a new version no longer holds up the first page load, startup needs fewer round trips, and item lists are prepared during the background refresh instead of on your next visit."
+    "version": "1.1.8",
+    "notes": "Feeds without an icon now show a default feed icon in the sidebar, and Reddit feeds that fail explain why: Reddit only serves RSS to logged-in readers, so use your private feed link from reddit.com/prefs/feeds."
 }

@@ -68,6 +68,35 @@ final class FeedFetcher
         return $result->httpCode === 404 && self::isYouTubeFeedUrl($url);
     }
 
+    /**
+     * The error shown for a non-2xx response. Reddit no longer serves RSS to
+     * readers that aren't logged in: rss.reddit.com answers 404 ("Not Found")
+     * for subreddits that exist, whatever the user agent, and allows about one
+     * anonymous request per rate-limit window (429). Its private feed links
+     * (reddit.com/prefs/feeds, which add ?feed=<token>&user=<name>) are the
+     * supported way in, so for Reddit the message says that instead of a bare
+     * status code.
+     */
+    public static function httpErrorMessage(string $url, int $httpCode): string
+    {
+        $message = 'HTTP ' . $httpCode;
+        if (!in_array($httpCode, [403, 404, 429], true) || !self::isRedditUrl($url)) {
+            return $message;
+        }
+        parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
+        if (!empty($query['feed'])) {
+            return $message;
+        }
+        return $message . ': Reddit only serves RSS to logged-in readers now. '
+            . 'Replace this feed with your private feed link from reddit.com/prefs/feeds.';
+    }
+
+    private static function isRedditUrl(string $url): bool
+    {
+        $host = strtolower((string) parse_url($url, PHP_URL_HOST));
+        return $host === 'reddit.com' || str_ends_with($host, '.reddit.com');
+    }
+
     private static function isYouTubeFeedUrl(string $url): bool
     {
         $parts = parse_url($url);

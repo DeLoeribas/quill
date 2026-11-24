@@ -17,6 +17,7 @@
   const ALL_ITEMS_ICON = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/></svg>';
   const UNREAD_ICON = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"/></svg>';
   // chevron.right shape; rotated -90deg via .chevron.collapsed in CSS to read as chevron.down when expanded
+  const DEFAULT_FEED_ICON = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11a9 9 0 0 1 9 9"/><path d="M4 4a16 16 0 0 1 16 16"/><circle cx="5" cy="19" r="1.5" fill="currentColor" stroke="none"/></svg>';
   const CHEVRON_ICON = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>';
   const REFRESH_INTERVAL_PRESETS = [15, 30, 60, 120, 240, 360, 720, 1440];
   const FILTER_KEY = 'rss_last_filter';
@@ -1641,6 +1642,13 @@
     }
   }
 
+  function defaultFeedIcon() {
+    const el = document.createElement('span');
+    el.className = 'feed-favicon feed-favicon-default';
+    el.innerHTML = DEFAULT_FEED_ICON;
+    return el;
+  }
+
   const faviconElements = new Map(); // feed.id -> { img, src } — reused across
                                       // renderSidebar() calls so favicons don't
                                       // flicker on every periodic poll
@@ -1665,8 +1673,8 @@
     row.appendChild(countEl);
 
     const faviconSrc = faviconUrlFor(feed);
+    let entry = faviconSrc ? faviconElements.get(feed.id) : null;
     if (faviconSrc) {
-      let entry = faviconElements.get(feed.id);
       if (!entry) {
         const img = document.createElement('img');
         img.className = 'feed-favicon';
@@ -1675,26 +1683,29 @@
         img.referrerPolicy = 'no-referrer';
         // src tracks the requested favicon URL so re-renders don't reset (and re-fail) a
         // fallback that's already showing feed.image_url in its place.
-        entry = { img, src: null };
+        entry = { img, src: null, failed: false };
         img.addEventListener('error', () => {
           // favicon.ico guesses 404 often; fall back to the feed's own channel image before giving up
           if (feed.image_url && img.src !== feed.image_url) {
             img.src = feed.image_url;
           } else {
-            img.remove();
-            faviconElements.delete(feed.id);
+            // Keep the entry (marked failed) so later re-renders show the default icon
+            // straight away instead of retrying a URL that's known to be broken.
+            entry.failed = true;
+            img.replaceWith(defaultFeedIcon());
           }
         });
         faviconElements.set(feed.id, entry);
       }
       if (entry.src !== faviconSrc) {
         entry.src = faviconSrc;
+        entry.failed = false;
         entry.img.src = faviconSrc;
       }
-      row.prepend(entry.img);
     } else {
       faviconElements.delete(feed.id);
     }
+    row.prepend(entry && !entry.failed ? entry.img : defaultFeedIcon());
 
     const filterBadge = document.createElement('span');
     filterBadge.className = 'filter-badge';

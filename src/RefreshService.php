@@ -92,7 +92,7 @@ final class RefreshService
         }
 
         if ($result->httpCode < 200 || $result->httpCode >= 300 || $result->body === null) {
-            return self::recordFailure($feed, $result, 'HTTP ' . $result->httpCode);
+            return self::recordFailure($feed, $result, FeedFetcher::httpErrorMessage($feed['url'], $result->httpCode));
         }
 
         $parsed = FeedFetcher::parse($result->body);
